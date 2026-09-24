@@ -32,8 +32,13 @@ def create_app() -> Flask:
     app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
     database_url = os.getenv("DATABASE_URL", "sqlite:///h3_automation.db").strip()
     if database_url.startswith("postgres://"):
-        database_url = "postgresql://" + database_url.removeprefix("postgres://")
-    if database_url.startswith("postgresql://") and "sslmode=" not in database_url:
+        database_url = "postgresql+psycopg2://" + database_url.removeprefix("postgres://")
+    elif database_url.startswith("postgresql://"):
+        # requirements.txt provides psycopg2-binary. Explicitly name that
+        # driver because newer SQLAlchemy releases otherwise default to
+        # psycopg (v3), which is a separate dependency.
+        database_url = "postgresql+psycopg2://" + database_url.removeprefix("postgresql://")
+    if database_url.startswith("postgresql+psycopg2://") and "sslmode=" not in database_url:
         database_url += "&sslmode=require" if "?" in database_url else "?sslmode=require"
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
