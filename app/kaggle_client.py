@@ -43,7 +43,7 @@ def _api(credentials=None):
 def _runtime_dir() -> Path:
     root = Path(__file__).resolve().parent.parent
     runtime_dir = root / "runtime"
-    runtime_dir.mkdir(exist_ok=True)
+    runtime_dir.mkdir(parents=True, exist_ok=True)
     return runtime_dir
 
 
@@ -111,7 +111,9 @@ def _embed_job_params(notebook_json: dict, params: dict) -> None:
 def _build_kaggle_push_folder(params_path: Path, kernel_id: str, job_id: str) -> Path:
     runtime_dir = _runtime_dir()
     push_dir = runtime_dir / "kaggle_push" / job_id
-    push_dir.mkdir(exist_ok=True)
+    # Render starts with a clean, ephemeral filesystem, so the kaggle_push
+    # parent will not exist on a fresh deploy (or after a restart).
+    push_dir.mkdir(parents=True, exist_ok=True)
 
     notebook_dir = Path(__file__).resolve().parent.parent / "notebook"
     notebooks = sorted(notebook_dir.glob("*.ipynb"))
