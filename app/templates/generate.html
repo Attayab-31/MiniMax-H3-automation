@@ -1,0 +1,244 @@
+﻿{% extends 'base.html' %}
+
+{% block title %}Generate video{% endblock %}
+
+{% block content %}
+  <div class="page-header mb-4">
+    <div>
+      <div class="pill mb-2">MiniMax H3 on Kaggle</div>
+      <h1 class="mb-1">Create a video</h1>
+      <p class="text-muted mb-0">Build the video as a sequence of connected shots. Each clip gets its own prompt and continues from the previous clip’s final frame.</p>
+    </div>
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary">Back to dashboard</a>
+  </div>
+
+  <form method="post" id="generate-form" class="row g-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="col-lg-8">
+      <section class="card shadow-sm h-100">
+        <div class="card-header py-3"><strong>1. Build your story</strong></div>
+        <div class="card-body">
+          <label class="form-label" for="niche">Topic or genre</label>
+          <input class="form-control mb-3" type="text" id="niche" name="niche" value="cinematic lifestyle" maxlength="255" placeholder="For example, quiet science-fiction mystery" />
+
+          <label class="form-label" for="prompt">Shared subject, setting, and style</label>
+          <textarea class="form-control" id="prompt" name="prompt" rows="4" maxlength="10000" required placeholder="Describe the subject and details that must stay consistent across every clip: character, setting, visual style, camera language, and audio mood."></textarea>
+          <div class="d-flex justify-content-between mt-2">
+            <div class="form-text">Keep character, clothing, location, lighting, and visual style consistent here. This is added to every clip.</div>
+            <div class="form-text"><span id="prompt-count">0</span>/10000</div>
+          </div>
+          <div class="d-flex align-items-end justify-content-between gap-3 mt-4 mb-2">
+            <div><h2 class="h5 mb-1">Clip-by-clip prompts</h2><p class="form-text mb-0">One shot and one main action per clip. The notebook carries the last frame into the next clip.</p></div>
+            <span class="badge text-bg-light border" id="clip-count">3 clips</span>
+          </div>
+          <div id="segment-prompts" class="d-grid gap-3">
+            {% for clip in range(1, 4) %}
+              <div class="border rounded p-3">
+                <label class="form-label fw-semibold" for="segment-prompt-{{ clip }}">Clip {{ clip }} · {{ (clip - 1) * 10 }}–{{ clip * 10 }} seconds</label>
+                <textarea class="form-control" rows="4" maxlength="5000" required id="segment-prompt-{{ clip }}" name="segment_prompts" placeholder="What does the subject do? Describe the shot, camera movement, lighting, and sound. End on a state the next clip can continue from."></textarea>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-lg-4">
+      <section class="card shadow-sm mb-4">
+        <div class="card-header py-3"><strong>2. Video plan</strong></div>
+        <div class="card-body">
+          <label class="form-label" for="kaggle_account_id">Kaggle account</label>
+          <select class="form-select mb-2" id="kaggle_account_id" name="kaggle_account_id" required>
+            {% set account_count = kaggle_accounts|length + (1 if environment_account_available else 0) %}
+            <option value="" disabled {% if account_count != 1 %}selected{% endif %}>Choose an account</option>
+            {% if environment_account_available %}
+              <option value="environment" {% if account_count == 1 %}selected{% endif %}>Environment account</option>
+            {% endif %}
+            {% for account in kaggle_accounts %}
+              <option value="{{ account.id }}" {% if account_count == 1 %}selected{% endif %}>{{ account.label }} · {{ account.username }}</option>
+            {% endfor %}
+          </select>
+          {% if not environment_account_available and not kaggle_accounts %}
+            <div class="form-text mb-3">Add Kaggle credentials in <a href="{{ url_for('settings.settings') }}">Settings</a> before generating a video.</div>
+          {% else %}
+            <div class="form-text mb-3">Each account uses its own private Kaggle notebook, so different accounts can generate videos at the same time.</div>
+          {% endif %}
+          <label class="form-label" for="duration_seconds">Total duration</label>
+          <div class="input-group mb-3">
+            <input class="form-control" type="number" id="duration_seconds" name="duration_seconds" value="30" min="5" max="60" step="1" required />
+            <span class="input-group-text">seconds</span>
+          </div>
+
+          <label class="form-label" for="clip_duration_seconds">Length per generated clip</label>
+          <div class="input-group mb-3">
+            <input class="form-control" type="number" id="clip_duration_seconds" name="clip_duration_seconds" value="10" min="5" max="15" step="1" required />
+            <span class="input-group-text">seconds</span>
+          </div>
+          <div id="clip-plan" class="alert alert-light border small mb-3" aria-live="polite"></div>
+
+          <label class="form-label" for="resolution_profile">Resolution</label>
+          <select class="form-select" id="resolution_profile" name="resolution_profile">
+            <option value="portrait" selected>Portrait 9:16 - 352 x 608 (recommended)</option>
+            <option value="fast">Landscape - 512 x 288 (fast preview)</option>
+            <option value="landscape">Landscape - 608 x 352 (balanced)</option>
+            <option value="detailed">Landscape - 736 x 416 (more detail)</option>
+            <option value="custom">Custom dimensions</option>
+          </select>
+          <input type="hidden" id="resolution_preset" name="resolution_preset" value="Custom" />
+          <div id="custom-dimensions" class="row g-2 mt-2 d-none">
+            <div class="col-6">
+              <label class="form-label small" for="custom_width">Width</label>
+              <input class="form-control" type="number" id="custom_width" name="custom_width" min="128" max="736" step="32" value="352" />
+            </div>
+            <div class="col-6">
+              <label class="form-label small" for="custom_height">Height</label>
+              <input class="form-control" type="number" id="custom_height" name="custom_height" min="128" max="736" step="32" value="608" />
+            </div>
+          </div>
+          <div class="form-text">Dimensions must be divisible by 32. The 352 x 608 portrait profile is the lightest H3 starting point.</div>
+        </div>
+      </section>
+
+      <section class="card shadow-sm">
+        <div class="card-header py-3"><strong>3. Generation settings</strong></div>
+        <div class="card-body">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="use_turbo_lora" name="use_turbo_lora" checked />
+            <label class="form-check-label" for="use_turbo_lora">Turbo LoRA</label>
+            <div class="form-text">Recommended for Kaggle T4. Uses fewer sampling steps.</div>
+          </div>
+          <div id="turbo-settings">
+            <label class="form-label" for="turbo_steps">Turbo steps</label>
+            <input class="form-control" type="number" id="turbo_steps" name="turbo_steps" value="4" min="1" max="8" />
+          </div>
+          <div id="standard-settings" class="d-none">
+            <label class="form-label" for="steps">Standard sampling steps</label>
+            <input class="form-control" type="number" id="steps" name="steps" value="20" min="4" max="30" />
+          </div>
+
+          <details class="mt-4">
+            <summary class="small fw-semibold">Advanced output options</summary>
+            <div class="pt-3">
+              <label class="form-label" for="seed">Seed</label>
+              <input class="form-control" type="number" id="seed" name="seed" min="0" max="4294967295" placeholder="Random seed" />
+              <div class="form-text">Leave blank to choose a new seed for this job.</div>
+
+              <label class="form-label mt-3" for="video_crf">Final video quality</label>
+              <select class="form-select" id="video_crf" name="video_crf">
+                <option value="16">Higher quality, larger file</option>
+                <option value="18" selected>Balanced</option>
+                <option value="21">Smaller file</option>
+              </select>
+              <label class="form-label mt-3" for="video_preset">Encoding speed</label>
+              <select class="form-select" id="video_preset" name="video_preset">
+                <option value="medium">Medium</option>
+                <option value="slow" selected>Slow, smaller file</option>
+              </select>
+              <div class="form-check mt-3">
+                <input class="form-check-input" type="checkbox" id="auto_fallback" name="auto_fallback" checked />
+                <label class="form-check-label" for="auto_fallback">Retry with safer settings after GPU memory errors</label>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-12 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3">
+      <div class="small text-muted">The job is assigned to the Kaggle account selected above. Jobs sent to different accounts can run at the same time; jobs for one account are queued safely.</div>
+      <button type="submit" class="btn btn-primary btn-lg px-4" id="submit-job">Queue video generation</button>
+    </div>
+  </form>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const totalInput = document.getElementById('duration_seconds');
+      const clipInput = document.getElementById('clip_duration_seconds');
+      const profile = document.getElementById('resolution_profile');
+      const customDimensions = document.getElementById('custom-dimensions');
+      const widthInput = document.getElementById('custom_width');
+      const heightInput = document.getElementById('custom_height');
+      const segmentPrompts = document.getElementById('segment-prompts');
+      const clipCount = document.getElementById('clip-count');
+      const clipPlan = document.getElementById('clip-plan');
+      const promptInput = document.getElementById('prompt');
+      const promptCount = document.getElementById('prompt-count');
+      const turbo = document.getElementById('use_turbo_lora');
+      const segmentDrafts = new Map();
+
+      const sizes = {
+        portrait: [352, 608],
+        fast: [512, 288],
+        landscape: [608, 352],
+        detailed: [736, 416]
+      };
+
+      function renderSegmentPrompts(count, clipSeconds, totalSeconds) {
+        segmentPrompts.querySelectorAll('textarea').forEach((input, index) => segmentDrafts.set(index, input.value));
+        segmentPrompts.replaceChildren();
+        let start = 0;
+        for (let index = 0; index < count; index += 1) {
+          const length = Math.min(clipSeconds, totalSeconds - start);
+          const end = start + length;
+          const wrapper = document.createElement('div');
+          wrapper.className = 'border rounded-3 p-3 bg-white';
+          const label = document.createElement('label');
+          label.className = 'form-label fw-semibold mb-1';
+          label.htmlFor = `segment-prompt-${index}`;
+          label.textContent = `Clip ${index + 1} · ${start}–${end} seconds`;
+          const textarea = document.createElement('textarea');
+          textarea.className = 'form-control';
+          textarea.rows = 4;
+          textarea.maxLength = 5000;
+          textarea.required = true;
+          textarea.name = 'segment_prompts';
+          textarea.id = label.htmlFor;
+          textarea.placeholder = `One clear action for this ${length}-second shot. Describe framing, camera movement, light, and sound; finish with a state the next clip can continue from.`;
+          textarea.value = segmentDrafts.get(index) ?? '';
+          wrapper.append(label, textarea);
+          segmentPrompts.append(wrapper);
+          start = end;
+        }
+      }
+
+      function updatePlan() {
+        const total = Number(totalInput.value) || 30;
+        const clip = Number(clipInput.value) || 10;
+        const count = Math.max(1, Math.ceil(total / clip));
+        const snapSeconds = seconds => {
+          const requestedFrames = Math.max(5, Math.round(seconds * 24));
+          const frames = requestedFrames + ((5 - (requestedFrames % 17) + 17) % 17);
+          return frames / 24;
+        };
+        const lengths = Array.from({ length: count }, (_, index) => Math.min(clip, total - index * clip));
+        const actual = lengths.reduce((sum, length) => sum + snapSeconds(length), 0) - Math.max(0, count - 1) / 24;
+        clipPlan.textContent = `${count} clip${count === 1 ? '' : 's'} planned. Frame rounding may produce about ${actual.toFixed(1)} seconds of finished video.`;
+        clipCount.textContent = `${count} clip${count === 1 ? '' : 's'}`;
+        renderSegmentPrompts(count, clip, total);
+      }
+
+      function updateProfile() {
+        const dimensions = sizes[profile.value];
+        customDimensions.classList.toggle('d-none', profile.value !== 'custom');
+        if (dimensions) {
+          widthInput.value = dimensions[0];
+          heightInput.value = dimensions[1];
+        }
+      }
+
+      function updateTurbo() {
+        document.getElementById('turbo-settings').classList.toggle('d-none', !turbo.checked);
+        document.getElementById('standard-settings').classList.toggle('d-none', turbo.checked);
+      }
+
+      totalInput.addEventListener('input', updatePlan);
+      clipInput.addEventListener('input', updatePlan);
+      profile.addEventListener('change', updateProfile);
+      promptInput.addEventListener('input', () => promptCount.textContent = promptInput.value.length);
+      turbo.addEventListener('change', updateTurbo);
+      updatePlan();
+      updateProfile();
+      updateTurbo();
+    });
+  </script>
+{% endblock %}

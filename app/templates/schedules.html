@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+
+{% block title %}Schedules{% endblock %}
+
+{% block content %}
+  <div class="page-header mb-4">
+    <div>
+      <div class="pill mb-2">Automation</div>
+      <h1>Daily schedules</h1>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header px-4 py-3"><strong>Create a repeat run</strong></div>
+    <div class="card-body p-4">
+      <form method="post" class="row g-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="col-md-4">
+          <label class="form-label" for="kaggle_account_id">Kaggle account</label>
+          <select class="form-select" id="kaggle_account_id" name="kaggle_account_id" required>
+            {% set account_count = kaggle_accounts|length + (1 if environment_account_available else 0) %}
+            <option value="" disabled {% if account_count != 1 %}selected{% endif %}>Choose account</option>
+            {% if environment_account_available %}<option value="environment" {% if account_count == 1 %}selected{% endif %}>Environment account</option>{% endif %}
+            {% for account in kaggle_accounts %}<option value="{{ account.id }}" {% if account_count == 1 %}selected{% endif %}>{{ account.label }} · {{ account.username }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Schedule name</label>
+          <input class="form-control" type="text" name="name" placeholder="Morning cinematic batch" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Niche</label>
+          <input class="form-control" type="text" name="niche" value="cinematic lifestyle" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Run time</label>
+          <input class="form-control" type="time" name="time_of_day" value="09:00">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Timezone</label>
+          <input class="form-control" type="text" name="timezone" value="UTC">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Duration</label>
+          <input class="form-control" type="number" id="duration_seconds" name="duration_seconds" value="30" min="5" max="60" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="chunk_seconds">Clip length</label>
+          <select class="form-select" id="chunk_seconds" name="chunk_seconds">
+            <option value="5">5 seconds · more beats</option>
+            <option value="8">8 seconds</option>
+            <option value="10" selected>10 seconds · balanced</option>
+            <option value="12">12 seconds</option>
+            <option value="15">15 seconds · fewer seams</option>
+          </select>
+        </div>
+        <div class="col-12"><div class="alert alert-light border small mb-0" id="schedule-plan" aria-live="polite"></div></div>
+        <div class="col-12">
+          <label class="form-label" for="style_notes">Shared subject and continuity</label>
+          <textarea class="form-control" id="style_notes" name="style_notes" rows="3" placeholder="Main subject, recurring character details, setting, visual style, and constraints to keep consistent in every clip."></textarea>
+        </div>
+        <div class="col-12"><h2 class="h5 mb-0 mt-2">Creative direction</h2><p class="form-text">Each scheduled run gets one H3 prompt per clip. Gemini improves the storyboard when configured; a built-in storyboard fallback works without it.</p></div>
+        {% for field, choices in creative_options.items() %}
+          <div class="col-md-6">
+            <label class="form-label" for="{{ field }}">{{ field.replace('_', ' ')|title }}</label>
+            <select class="form-select" id="{{ field }}" name="{{ field }}">
+              {% for value, label in choices.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+        {% endfor %}
+        <div class="col-md-4">
+          <label class="form-label">Preset</label>
+          <select class="form-select" id="resolution_preset" name="resolution_preset">
+            <option value="Portrait vertical · 352×608" selected>Portrait 9:16 · 352 × 608</option>
+            <option value="Fast preview · 512×288">Fast preview · 512×288</option>
+            <option value="Kaggle safe · 608×352">Kaggle safe · 608×352</option>
+            <option value="Detailed preview · 736×416">Detailed preview · 736×416</option>
+            <option value="Custom">Custom</option>
+          </select>
+        </div>
+
+        <div id="custom-dimensions" class="row g-3 d-none col-12">
+          <div class="col-md-3">
+            <label class="form-label">Custom width</label>
+            <input class="form-control" type="number" name="custom_width" min="128" step="32" value="352">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Custom height</label>
+            <input class="form-control" type="number" name="custom_height" min="128" step="32" value="608">
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="use_turbo_lora" name="use_turbo_lora" checked>
+            <label class="form-check-label" for="use_turbo_lora">Use Turbo LoRA for faster generation</label>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="turbo_steps">Turbo steps</label>
+          <input class="form-control" type="number" id="turbo_steps" name="turbo_steps" value="4" min="1" max="8">
+        </div>
+        <div class="col-12">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="enabled" name="enabled" checked>
+            <label class="form-check-label" for="enabled">This schedule is active</label>
+          </div>
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-primary">Create schedule</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if schedules %}
+    <div class="card">
+      <div class="card-header px-4 py-3"><strong>Saved schedules</strong></div>
+      <div class="list-group list-group-flush">
+        {% for schedule in schedules %}
+          <a class="list-group-item list-group-item-action px-4 py-3" href="{{ url_for('schedules.detail', schedule_id=schedule.id) }}">
+            <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+              <div>
+                <div class="fw-semibold">{{ schedule.name }}</div>
+                <small class="text-muted">{{ schedule.niche }} · {{ schedule.time_of_day }} {{ schedule.timezone }} · {{ schedule.kaggle_account.label if schedule.kaggle_account else 'Environment account' }}</small>
+              </div>
+              <span class="status-chip {{ 'bg-success-subtle text-success-emphasis' if schedule.enabled else 'bg-secondary-subtle text-secondary-emphasis' }}">
+                {{ 'Enabled' if schedule.enabled else 'Disabled' }}
+              </span>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+  {% else %}
+    <div class="empty-state">No schedules created yet. Build your first recurring run above.</div>
+  {% endif %}
+
+  <script>
+    const totalInput = document.getElementById('duration_seconds');
+    const chunkInput = document.getElementById('chunk_seconds');
+    const plan = document.getElementById('schedule-plan');
+    function updateSchedulePlan() {
+      const total = Number(totalInput.value) || 30;
+      const chunk = Number(chunkInput.value) || 10;
+      const count = Math.ceil(total / chunk);
+      plan.textContent = `${count} connected H3 clips per run. Each clip is generated within H3's 5–15 second range.`;
+    }
+    totalInput.addEventListener('input', updateSchedulePlan);
+    chunkInput.addEventListener('change', updateSchedulePlan);
+    updateSchedulePlan();
+    const schedulePreset = document.getElementById('resolution_preset');
+    const customDimensions = document.getElementById('custom-dimensions');
+
+    function toggleCustomDimensions() {
+      const showCustom = schedulePreset && schedulePreset.value === 'Custom';
+      if (customDimensions) {
+        customDimensions.classList.toggle('d-none', !showCustom);
+      }
+    }
+
+    if (schedulePreset) {
+      schedulePreset.addEventListener('change', toggleCustomDimensions);
+      toggleCustomDimensions();
+    }
+  </script>
+{% endblock %}

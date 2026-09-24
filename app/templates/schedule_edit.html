@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit schedule{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <div class="pill mb-2">Editing</div>
+      <h1 class="mb-0">{{ schedule.name }}</h1>
+    </div>
+    <a href="{{ url_for('schedules.list_schedules') }}" class="btn btn-outline-secondary">All schedules</a>
+  </div>
+
+  <form method="post" class="row g-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="col-md-6">
+      <label class="form-label" for="kaggle_account_id">Kaggle account</label>
+      <select class="form-select" id="kaggle_account_id" name="kaggle_account_id" required>
+        <option value="" disabled {% if not schedule.kaggle_account_id and not environment_account_available %}selected{% endif %}>Choose account</option>
+        {% if environment_account_available %}<option value="environment" {% if not schedule.kaggle_account_id %}selected{% endif %}>Environment account</option>{% endif %}
+        {% for account in kaggle_accounts %}<option value="{{ account.id }}" {% if schedule.kaggle_account_id == account.id %}selected{% endif %}>{{ account.label }} · {{ account.username }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="name">Schedule name</label>
+      <input class="form-control" id="name" name="name" type="text" value="{{ schedule.name }}" />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label" for="niche">Niche</label>
+      <input class="form-control" id="niche" name="niche" type="text" value="{{ schedule.niche }}" />
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="style_notes">Style notes</label>
+      <textarea class="form-control" id="style_notes" name="style_notes" rows="4">{{ schedule.style_notes or '' }}</textarea>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="time_of_day">Time</label>
+      <input class="form-control" id="time_of_day" name="time_of_day" type="time" value="{{ schedule.time_of_day }}" />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="timezone">Timezone</label>
+      <input class="form-control" id="timezone" name="timezone" type="text" value="{{ schedule.timezone }}" />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="resolution_preset">Preset</label>
+      <select class="form-select" id="resolution_preset" name="resolution_preset">
+        <option value="Portrait vertical · 352×608" {% if schedule.resolution_preset == 'Portrait vertical · 352×608' %}selected{% endif %}>Portrait 9:16 · 352 × 608</option>
+        <option value="Fast preview · 512×288" {% if schedule.resolution_preset == 'Fast preview · 512×288' %}selected{% endif %}>Fast preview · 512×288</option>
+        <option value="Kaggle safe · 608×352" {% if schedule.resolution_preset == 'Kaggle safe · 608×352' %}selected{% endif %}>Kaggle safe · 608×352</option>
+        <option value="Detailed preview · 736×416" {% if schedule.resolution_preset == 'Detailed preview · 736×416' %}selected{% endif %}>Detailed preview · 736×416</option>
+        <option value="Custom" {% if schedule.resolution_preset == 'Custom' %}selected{% endif %}>Custom</option>
+      </select>
+    </div>
+
+    <div id="custom-dimensions" class="row g-3 col-12 {% if schedule.resolution_preset != 'Custom' %}d-none{% endif %}">
+      <div class="col-md-3">
+        <label class="form-label" for="custom_width">Custom width</label>
+        <input class="form-control" id="custom_width" name="custom_width" type="number" min="128" step="1" value="{{ schedule.custom_width or 608 }}" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="custom_height">Custom height</label>
+        <input class="form-control" id="custom_height" name="custom_height" type="number" min="128" step="1" value="{{ schedule.custom_height or 352 }}" />
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label" for="duration_seconds">Duration</label>
+      <input class="form-control" id="duration_seconds" name="duration_seconds" type="number" value="{{ schedule.duration_seconds }}" min="5" max="60" />
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="chunk_seconds">Clip length</label>
+      <select class="form-select" id="chunk_seconds" name="chunk_seconds">
+        {% for seconds in [5, 8, 10, 12, 15] %}<option value="{{ seconds }}" {% if schedule.chunk_seconds == seconds %}selected{% endif %}>{{ seconds }} seconds{% if seconds == 10 %} · balanced{% elif seconds == 15 %} · fewer seams{% endif %}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="style_notes">Shared subject and continuity</label>
+      <textarea class="form-control" id="style_notes" name="style_notes" rows="3" placeholder="Recurring character details, setting, visual style, and constraints to keep consistent.">{{ schedule.style_notes or '' }}</textarea>
+    </div>
+    <div class="col-12"><h2 class="h5 mb-0 mt-2">Creative direction</h2><p class="form-text">The prompt writer turns these choices into a sequence of H3 clip prompts on every run.</p></div>
+    {% for field, choices in creative_options.items() %}
+      <div class="col-md-6">
+        <label class="form-label" for="{{ field }}">{{ field.replace('_', ' ')|title }}</label>
+        <select class="form-select" id="{{ field }}" name="{{ field }}">
+          {% for value, label in choices.items() %}<option value="{{ value }}" {% if (schedule.creative_brief or {}).get(field, choices.keys()|first) == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+    {% endfor %}
+    <div class="col-md-4">
+      <label class="form-label" for="turbo_steps">Turbo steps</label>
+      <input class="form-control" id="turbo_steps" name="turbo_steps" type="number" value="{{ schedule.turbo_steps or 4 }}" min="1" max="8" />
+    </div>
+    <div class="col-md-4">
+      <div class="form-check form-switch mt-4">
+        <input class="form-check-input" type="checkbox" id="use_turbo_lora" name="use_turbo_lora" {% if schedule.use_turbo_lora %}checked{% endif %}>
+        <label class="form-check-label" for="use_turbo_lora">Use Turbo LoRA</label>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Platforms</label>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="youtube" name="platforms" value="youtube" {% if 'youtube' in (schedule.target_platforms or []) %}checked{% endif %}>
+        <label class="form-check-label" for="youtube">YouTube</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="tiktok" name="platforms" value="tiktok" {% if 'tiktok' in (schedule.target_platforms or []) %}checked{% endif %}>
+        <label class="form-check-label" for="tiktok">TikTok</label>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="enabled" name="enabled" {% if schedule.enabled %}checked{% endif %}>
+        <label class="form-check-label" for="enabled">Enable automatic runs</label>
+      </div>
+    </div>
+    <div class="col-12">
+      <div class="alert alert-warning mb-0">
+        TikTok posts stay private/self-only until the developer app clears content audit review. This is enforced in the app and shown in the Settings page as well.
+      </div>
+    </div>
+    <div class="col-12 d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Save schedule</button>
+      <button type="submit" formmethod="post" formaction="{{ url_for('schedules.delete', schedule_id=schedule.id) }}" class="btn btn-outline-danger">Delete</button>
+    </div>
+  </form>
+
+  <script>
+    const schedulePreset = document.getElementById('resolution_preset');
+    const customDimensions = document.getElementById('custom-dimensions');
+
+    function toggleCustomDimensions() {
+      const showCustom = schedulePreset && schedulePreset.value === 'Custom';
+      if (customDimensions) {
+        customDimensions.classList.toggle('d-none', !showCustom);
+      }
+    }
+
+    if (schedulePreset) {
+      schedulePreset.addEventListener('change', toggleCustomDimensions);
+      toggleCustomDimensions();
+    }
+  </script>
+{% endblock %}

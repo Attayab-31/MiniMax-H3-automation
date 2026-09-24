@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <div class="pill mb-2">Workspace</div>
+      <h1>Settings</h1>
+      <p class="text-muted mb-0">Connection status for the services used by generation and publishing.</p>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header px-4 py-3"><strong>Service connections</strong></div>
+    <div class="list-group list-group-flush">
+      {% for service, is_configured in configured.items() %}
+        <div class="list-group-item px-4 py-3 d-flex justify-content-between align-items-center">
+          <span class="fw-semibold">{{ service }}</span>
+          <span class="status-chip {{ 'bg-success-subtle text-success-emphasis' if is_configured else 'bg-secondary-subtle text-secondary-emphasis' }}">{{ 'Configured' if is_configured else 'Not configured' }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="alert alert-info">
+    Add the Flask and encryption keys to the deployment environment. Kaggle API keys entered below are encrypted before they are stored; saved keys are never shown again.
+  </div>
+  <div class="card mb-4">
+    <div class="card-header px-4 py-3"><strong>Kaggle accounts</strong></div>
+    <div class="card-body p-4">
+      <p class="text-muted">Add one profile for each Kaggle account. Give every account its own kernel ID so submissions and outputs remain separate.</p>
+      {% if accounts %}
+        <div class="list-group mb-4">
+          {% for account in accounts %}
+            <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-3">
+              <div>
+                <div class="fw-semibold">{{ account.label }} <span class="text-muted fw-normal">@{{ account.username }}</span></div>
+                <small class="text-muted">{{ account.kernel_id }}</small>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <span class="status-chip {{ 'bg-success-subtle text-success-emphasis' if account.enabled else 'bg-secondary-subtle text-secondary-emphasis' }}">{{ 'Enabled' if account.enabled else 'Disabled' }}</span>
+                <form method="post" action="{{ url_for('settings.toggle_kaggle_account', account_id=account.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-secondary" type="submit">{{ 'Disable' if account.enabled else 'Enable' }}</button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state mb-4">No saved Kaggle accounts yet. You can still use the legacy environment account if its credentials are configured.</div>
+      {% endif %}
+      <form method="post" class="row g-3" autocomplete="off">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="col-md-4">
+          <label class="form-label" for="account-label">Account label</label>
+          <input class="form-control" id="account-label" name="label" required maxlength="120" placeholder="GPU account 1">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="account-username">Kaggle username</label>
+          <input class="form-control" id="account-username" name="username" required maxlength="120" autocomplete="off">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="account-kernel">Kernel ID <span class="text-muted fw-normal">(optional)</span></label>
+          <input class="form-control" id="account-kernel" name="kernel_id" placeholder="username/h3-automation-account-1">
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="account-api-key">Kaggle API key</label>
+          <input class="form-control" id="account-api-key" name="api_key" type="password" required autocomplete="new-password">
+          <div class="form-text">Stored encrypted with <code>FERNET_KEY</code>. Generate one with <code>python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"</code>, configure it in the environment, and keep that same key for future restarts.</div>
+        </div>
+        <div class="col-12"><button class="btn btn-primary" type="submit">Add Kaggle account</button></div>
+      </form>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header px-4 py-3"><strong>Notebook workflow</strong></div>
+    <div class="card-body px-4">
+      <p class="mb-2">Manual and scheduled jobs send generation parameters to the checked-in Kaggle notebook. Kaggle credentials are required to submit jobs and retrieve the completed video.</p>
+      <p class="mb-0 text-muted">Platform credentials are only needed when a job is configured to publish. Posting connections must be implemented and authorized before enabling automated publishing.</p>
+    </div>
+  </div>
+{% endblock %}

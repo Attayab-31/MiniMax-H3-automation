@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+      <div class="pill mb-2">Overview</div>
+      <h1 class="mb-0">Dashboard</h1>
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('generate.generate') }}">New manual run</a>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-8">
+      <div class="card">
+        <div class="card-header px-4 py-3"><strong>Recent jobs</strong></div>
+        <div class="card-body p-0">
+          {% if jobs %}
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Niche</th>
+                    <th>Kaggle account</th>
+                    <th>Platforms</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for job in jobs %}
+                    <tr>
+                      <td><a href="{{ url_for('jobs.detail', job_id=job.id) }}">{{ job.job_id[:8] }}</a></td>
+                      <td><span class="badge text-bg-secondary">{{ job.status }}</span></td>
+                      <td>{{ job.niche or 'General' }}</td>
+                      <td>{{ job.kaggle_account_name or 'Environment account' }}</td>
+                      <td>{{ ', '.join(job.target_platforms or []) }}</td>
+                      <td>{{ job.created_at.strftime('%Y-%m-%d %H:%M') if job.created_at else '—' }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="p-4 text-muted">No jobs have run yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-4">
+      <div class="card h-100">
+        <div class="card-header px-4 py-3"><strong>Upcoming schedules</strong></div>
+        <div class="card-body">
+          {% if upcoming_schedules %}
+            <ul class="list-group list-group-flush">
+              {% for schedule in upcoming_schedules %}
+                <li class="list-group-item px-0">
+                  <div class="fw-semibold"><a href="{{ url_for('schedules.detail', schedule_id=schedule.id) }}">{{ schedule.name }}</a></div>
+                  <small class="text-muted">{{ schedule.niche }} · {{ schedule.time_of_day }} {{ schedule.timezone }} · {{ schedule.kaggle_account.label if schedule.kaggle_account else 'Environment account' }}</small>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="text-muted">No enabled schedules yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

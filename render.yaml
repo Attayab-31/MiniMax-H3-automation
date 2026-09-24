@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: h3-video-automation
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: flask --app run db upgrade && gunicorn --workers 1 --threads 8 --timeout 1200 --access-logfile - --error-logfile - run:app
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: FLASK_DEBUG
+        value: "false"
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: FERNET_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: h3-videos
+      - key: KAGGLE_ENABLE_GPU
+        value: "true"
+      - key: KAGGLE_GPU_TYPE
+        value: T4
+      - key: KAGGLE_MAX_CONCURRENT_ACCOUNTS
+        value: "4"
