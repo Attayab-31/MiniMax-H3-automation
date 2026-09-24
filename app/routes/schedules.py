@@ -85,7 +85,7 @@ def list_schedules():
 @schedules_bp.route("/schedules/<int:schedule_id>", methods=["GET", "POST"])
 @login_required
 def detail(schedule_id: int):
-    schedule = Schedule.query.get_or_404(schedule_id)
+    schedule = db.get_or_404(Schedule, schedule_id)
     if request.method == "POST":
         try:
             account_id = _selected_account_id(request.form.get("kaggle_account_id", "environment"))
@@ -134,9 +134,12 @@ def detail(schedule_id: int):
 @schedules_bp.route("/schedules/<int:schedule_id>/delete", methods=["POST"])
 @login_required
 def delete(schedule_id: int):
-    schedule = Schedule.query.get_or_404(schedule_id)
+    schedule = db.get_or_404(Schedule, schedule_id)
+    for job in schedule.jobs:
+        job.schedule_id = None
+    name = schedule.name
     db.session.delete(schedule)
     db.session.commit()
     remove_schedule_job(schedule_id)
-    flash("Schedule removed.", "success")
+    flash(f"Schedule {name} and its saved prompt were deleted. Generated job history was kept.", "success")
     return redirect(url_for("schedules.list_schedules"))

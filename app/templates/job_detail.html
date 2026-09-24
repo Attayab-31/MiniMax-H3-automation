@@ -9,7 +9,19 @@
       <h1 class="mb-1">Video job <span class="text-muted">{{ job.job_id[:8] }}</span></h1>
       <div class="text-muted">{{ job.niche or 'Custom prompt' }}</div>
     </div>
-    <span id="job-status-badge" class="badge text-bg-secondary fs-6 px-3 py-2">{{ job.status }}</span>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <span id="job-status-badge" class="badge text-bg-secondary fs-6 px-3 py-2">{{ job.status }}</span>
+      {% if job.status in ['completed', 'failed'] %}
+        <form method="post" action="{{ url_for('jobs.delete_prompts', job_id=job.id) }}" onsubmit="return confirm('Delete this job’s prompts, prompt settings, and logs? The video and job history will remain. A linked schedule keeps its own template.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-secondary" type="submit">Delete prompts</button>
+        </form>
+        <form method="post" action="{{ url_for('jobs.delete_everything', job_id=job.id) }}" onsubmit="return confirm('Permanently delete this job, app prompts, logs, metadata, and stored video? A linked schedule, Kaggle versions, and published platform posts remain.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-danger" type="submit">Delete all job data</button>
+        </form>
+      {% endif %}
+    </div>
   </div>
 
   <div class="row g-4">
@@ -62,6 +74,12 @@
           </div>
         </section>
       {% endif %}
+      {% if job.status in ['completed', 'failed'] %}
+        <p class="small text-muted">Prompt deletion here clears this job only. Delete or edit a linked schedule separately to remove its saved prompt and stop future runs.</p>
+      {% endif %}
+      {% if job.status not in ['completed', 'failed'] %}
+        <div class="small text-muted mb-3">Prompt and job deletion becomes available after this job finishes.</div>
+      {% endif %}
 
       <details class="card shadow-sm">
         <summary class="card-header py-3 fw-semibold">Run log</summary>
@@ -73,9 +91,11 @@
       <section class="card shadow-sm">
         <div class="card-header py-3"><strong>Final video</strong></div>
         <div class="card-body" id="video-panel">
-          {% if (job.manifest_json or {}).get('local_final_video') or (job.manifest_json or {}).get('storage_path') %}
+          {% if job.video_storage_path or (job.manifest_json or {}).get('local_final_video') or (job.manifest_json or {}).get('storage_path') %}
             <video id="job-video" controls playsinline class="w-100" src="{{ url_for('jobs.video', job_id=job.id) }}"></video>
             <a id="job-download" class="btn btn-primary w-100 mt-3" href="{{ url_for('jobs.download', job_id=job.id) }}">Download video</a>
+          {% elif (job.manifest_json or {}).get('video_deleted_at') %}
+            <div id="job-video-empty" class="text-muted">This video was deleted from Supabase Storage. The job and prompts are still available in your history.</div>
           {% else %}
             <div id="job-video-empty" class="text-muted">The video preview and download appear as soon as Flask receives the finished file.</div>
           {% endif %}

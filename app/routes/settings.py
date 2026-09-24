@@ -6,7 +6,7 @@ from flask_login import login_required
 
 from app import db
 from app.kaggle_accounts import encrypt_api_key
-from app.models import KaggleAccount, Schedule
+from app.models import GenerationJob, KaggleAccount, Schedule
 from app.scheduler import remove_schedule_job
 
 settings_bp = Blueprint("settings", __name__)
@@ -89,4 +89,31 @@ def toggle_kaggle_account(account_id: int):
     if paused_schedules:
         message += f" Paused {len(paused_schedules)} schedule(s) assigned to this account."
     flash(message, "success")
+    return redirect(url_for("settings.settings"))
+
+
+@settings_bp.route("/settings/kaggle-accounts/<int:account_id>/delete", methods=["POST"])
+@login_required
+def delete_kaggle_account(account_id: int):
+    account = db.get_or_404(KaggleAccount, account_id)
+    active_jobs = GenerationJob.query.filter(
+        GenerationJob.kaggle_account_id == account.id,
+        GenerationJob.status.in_(("queued", "pushing", "running", "downloading", "posting")),
+    ).count()
+    if active_jobs:
+        flash("Wait for this account's active jobs to finish before deleting its credentials.", "error")
+        return redirect(url_for("settings.settings"))
+
+    schedules = Schedule.query.filter_by(kaggle_account_id=account.id).all()
+    for schedule in schedules:
+        schedule.enabled = False
+        schedule.kaggle_account_id = None
+        remove_schedule_job(schedule.id)
+    GenerationJob.query.filter_by(kaggle_account_id=account.id).update(
+        {GenerationJob.kaggle_account_id: None}, synchronize_session=False
+    )
+    label = account.label
+    db.session.delete(account)
+    db.session.commit()
+    flash(f"Kaggle credentials for {label} were deleted. Its schedules were paused; job history was kept.", "success")
     return redirect(url_for("settings.settings"))

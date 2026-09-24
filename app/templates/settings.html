@@ -44,6 +44,10 @@
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button class="btn btn-sm btn-outline-secondary" type="submit">{{ 'Disable' if account.enabled else 'Enable' }}</button>
                 </form>
+                <form method="post" action="{{ url_for('settings.delete_kaggle_account', account_id=account.id) }}" onsubmit="return confirm('Delete this saved Kaggle API key? Assigned schedules will be paused. Completed job history stays.');">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">Delete credentials</button>
+                </form>
               </div>
             </div>
           {% endfor %}

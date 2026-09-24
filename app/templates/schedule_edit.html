@@ -120,7 +120,7 @@
     </div>
     <div class="col-12 d-flex gap-2">
       <button type="submit" class="btn btn-primary">Save schedule</button>
-      <button type="submit" formmethod="post" formaction="{{ url_for('schedules.delete', schedule_id=schedule.id) }}" class="btn btn-outline-danger">Delete</button>
+      <button type="submit" formmethod="post" formaction="{{ url_for('schedules.delete', schedule_id=schedule.id) }}" class="btn btn-outline-danger" onclick="return confirm('Delete this schedule and its saved prompt? Generated job history and videos will be kept.');">Delete schedule</button>
     </div>
   </form>
 

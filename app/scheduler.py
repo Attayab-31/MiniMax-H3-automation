@@ -65,7 +65,7 @@ def remove_schedule_job(schedule_id: int):
 
 def _fire_schedule(app, schedule_id: int):
     with app.app_context():
-        schedule = Schedule.query.get(schedule_id)
+        schedule = db.session.get(Schedule, schedule_id)
         if schedule is None or not schedule.enabled:
             return
         if schedule.kaggle_account_id is not None:
