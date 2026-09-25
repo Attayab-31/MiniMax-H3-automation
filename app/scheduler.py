@@ -7,7 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from app import db
 from app.models import GenerationJob, KaggleAccount, Schedule, utcnow
-from app.pipeline import run_pipeline_in_app_context
+from app.pipeline import resume_pipeline_in_app_context, run_pipeline_in_app_context
 
 
 _scheduler = None
@@ -31,6 +31,19 @@ def init_scheduler(app):
     _scheduler = scheduler
 
     with app.app_context():
+        interrupted_jobs = GenerationJob.query.filter(
+            GenerationJob.status.in_(("queued", "pushing", "running", "downloading", "posting"))
+        ).order_by(GenerationJob.created_at.asc()).all()
+        for job in interrupted_jobs:
+            app.logger.warning(
+                "Resuming interrupted generation job %s (status=%s)",
+                job.job_id,
+                job.status,
+            )
+            app.config["EXECUTOR"].submit(
+                resume_pipeline_in_app_context, app, job.id
+            )
+
         for schedule in Schedule.query.filter_by(enabled=True).all():
             add_or_update_schedule_job(app, schedule)
 

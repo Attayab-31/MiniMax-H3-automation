@@ -30,6 +30,54 @@ def run_pipeline_in_app_context(app, job_id: int):
         run_pipeline(job)
 
 
+def resume_pipeline_in_app_context(app, job_id: int):
+    """Resume a persisted job after the web process that owned it restarted.
+
+    Kaggle keeps running independently of Render, while the in-process executor
+    does not survive a deploy or instance restart. Resume from Kaggle status so
+    a completed notebook can still be downloaded and attached to its job.
+    """
+    with app.app_context():
+        job = db.session.get(GenerationJob, job_id)
+        if job is None or job.status in {"completed", "failed"}:
+            return
+        with _account_lock(job):
+            _resume_pipeline(job)
+
+
+def _resume_pipeline(job: GenerationJob):
+    try:
+        wait_until_complete(job)
+        if job.status == "failed":
+            raise RuntimeError(job.error_message or "Kaggle execution failed.")
+
+        job.status = "downloading"
+        db.session.commit()
+        fetch_output(job)
+        db.session.commit()
+
+        if job.target_platforms:
+            job.status = "posting"
+            db.session.commit()
+            for platform in job.target_platforms:
+                metadata = generate_platform_metadata(
+                    job.niche or "general",
+                    job.prompt_text or job.generation_params.get("prompt") or "",
+                    platform,
+                )
+                job.post_results[platform] = _post_to_platform(platform, job, metadata)
+                db.session.commit()
+
+        job.status = "completed"
+        job.error_message = None
+    except Exception as exc:
+        job.status = "failed"
+        job.error_message = str(exc)
+    finally:
+        job.completed_at = utcnow()
+        db.session.commit()
+
+
 def _post_to_platform(platform: str, job: GenerationJob, metadata: dict):
     manifest = job.manifest_json or {}
     path = manifest.get("local_final_video")
