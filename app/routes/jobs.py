@@ -10,7 +10,11 @@ from sqlalchemy import or_
 
 from app import csrf, db
 from app.models import GenerationJob, utcnow
-from app.pipeline import retry_posting_only, run_pipeline_in_app_context
+from app.pipeline import (
+    retry_posting_only,
+    retry_video_download_in_app_context,
+    run_pipeline_in_app_context,
+)
 from app.storage import delete_video as delete_stored_video, signed_video_url
 
 
@@ -323,6 +327,29 @@ def retry_posting(job_id: int):
         flash("Retrying posting for this job only.", "success")
     else:
         flash("This job has no completed video to post yet.", "error")
+    return redirect(url_for("jobs.detail", job_id=job.id))
+
+
+@jobs_bp.route("/jobs/<int:job_id>/retry-video-download", methods=["POST"])
+@login_required
+def retry_video_download(job_id: int):
+    job = db.get_or_404(GenerationJob, job_id)
+    manifest = job.manifest_json or {}
+    if job.status != "failed":
+        flash("Only failed jobs can retry the Kaggle video download.", "error")
+        return redirect(url_for("jobs.detail", job_id=job.id))
+    if job.video_storage_path or manifest.get("local_final_video") or manifest.get("storage_path"):
+        flash("This job already has a video attached.", "error")
+        return redirect(url_for("jobs.detail", job_id=job.id))
+
+    job.status = "downloading"
+    job.error_message = None
+    db.session.commit()
+    app = current_app._get_current_object()
+    app.config["EXECUTOR"].submit(
+        retry_video_download_in_app_context, app, job.id
+    )
+    flash("Retrying the completed Kaggle run's video download.", "success")
     return redirect(url_for("jobs.detail", job_id=job.id))
 
 

@@ -45,6 +45,29 @@ def resume_pipeline_in_app_context(app, job_id: int):
             _resume_pipeline(job)
 
 
+def retry_video_download_in_app_context(app, job_id: int):
+    """Retry only artifact retrieval for a Kaggle run that already completed."""
+    with app.app_context():
+        job = db.session.get(GenerationJob, job_id)
+        if job is None or job.status != "downloading":
+            return
+        with _account_lock(job):
+            try:
+                job.status = "downloading"
+                db.session.commit()
+                _fetch_output_with_retries(job)
+                db.session.commit()
+                job.status = "completed"
+                job.error_message = None
+            except Exception as exc:
+                job.status = "failed"
+                job.error_message = f"Video download retry failed: {exc}"
+                app.logger.exception("Video download retry failed for job %s", job.job_id)
+            finally:
+                job.completed_at = utcnow()
+                db.session.commit()
+
+
 def _resume_pipeline(job: GenerationJob):
     try:
         wait_until_complete(job)
@@ -53,7 +76,7 @@ def _resume_pipeline(job: GenerationJob):
 
         job.status = "downloading"
         db.session.commit()
-        fetch_output(job)
+        _fetch_output_with_retries(job)
         db.session.commit()
 
         if job.target_platforms:
@@ -119,8 +142,28 @@ def _post_to_platform(platform: str, job: GenerationJob, metadata: dict):
 
 def wait_until_complete(job, poll_interval: float = 30.0, timeout_minutes: int = 660) -> None:
     deadline = time.monotonic() + (timeout_minutes * 60)
+    consecutive_poll_errors = 0
     while True:
-        status = poll_status(job)
+        try:
+            status = poll_status(job)
+            consecutive_poll_errors = 0
+        except Exception as exc:
+            consecutive_poll_errors += 1
+            job.status = "running"
+            job.log_tail = (
+                f"Kaggle status check failed; retrying "
+                f"({consecutive_poll_errors}/10): {exc}"
+            )[-12000:]
+            db.session.commit()
+            if consecutive_poll_errors >= 10:
+                raise RuntimeError(
+                    f"Kaggle status checks failed 10 times in a row. Last error: {exc}"
+                ) from exc
+
+            retry_delay = min(60.0, max(5.0, 5.0 * (2 ** (consecutive_poll_errors - 1))))
+            time.sleep(min(retry_delay, poll_interval))
+            continue
+
         job.status = status
         db.session.commit()
 
@@ -134,6 +177,26 @@ def wait_until_complete(job, poll_interval: float = 30.0, timeout_minutes: int =
             raise TimeoutError("timed out waiting on Kaggle")
 
         time.sleep(poll_interval)
+
+
+def _fetch_output_with_retries(job: GenerationJob, attempts: int = 3) -> None:
+    last_error = None
+    for attempt in range(1, attempts + 1):
+        try:
+            fetch_output(job)
+            return
+        except Exception as exc:
+            last_error = exc
+            job.log_tail = (
+                f"Kaggle output download failed; retrying "
+                f"({attempt}/{attempts}): {exc}"
+            )[-12000:]
+            db.session.commit()
+            if attempt < attempts:
+                time.sleep(5 * attempt)
+    raise RuntimeError(
+        f"Kaggle output download failed after {attempts} attempts: {last_error}"
+    ) from last_error
 
 
 def retry_posting_only(job: GenerationJob):
@@ -202,7 +265,7 @@ def _run_pipeline(job: GenerationJob):
 
         job.status = "downloading"
         db.session.commit()
-        fetch_output(job)
+        _fetch_output_with_retries(job)
         db.session.commit()
 
         if job.target_platforms:

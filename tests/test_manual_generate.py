@@ -109,8 +109,36 @@ class ManualGenerateRouteTests(unittest.TestCase):
 
         with self.app.app_context():
             refreshed_job = db.session.get(GenerationJob, job.id)
-        self.assertEqual(refreshed_job.status, "completed")
+            self.assertEqual(refreshed_job.status, "completed")
         trigger.assert_called_once()
+
+    def test_failed_job_can_retry_kaggle_video_download(self):
+        self._login()
+        self.app.config["EXECUTOR"].submit = Mock()
+        with self.app.app_context():
+            job = GenerationJob(
+                mode="manual",
+                status="failed",
+                error_message="Kaggle output download failed",
+                generation_params={},
+                target_platforms=[],
+            )
+            db.session.add(job)
+            db.session.commit()
+            job_id = job.id
+
+        token = self._csrf_token(f"/jobs/{job_id}")
+        response = self.client.post(
+            f"/jobs/{job_id}/retry-video-download",
+            data={"csrf_token": token},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        with self.app.app_context():
+            job = db.session.get(GenerationJob, job_id)
+            self.assertEqual(job.status, "downloading")
+            self.assertIsNone(job.error_message)
+        self.app.config["EXECUTOR"].submit.assert_called_once()
 
     def test_custom_schedule_sizes_are_preserved_for_generations(self):
         with self.app.app_context():

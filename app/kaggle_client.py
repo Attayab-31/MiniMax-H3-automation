@@ -64,8 +64,12 @@ def _download_kernel_output(api, kernel_id: str, output_dir: Path, pattern: str)
 
     # Some wrappers return (files, metadata), while KaggleApi itself returns
     # files directly. Never unpack the path list as a fixed-size tuple.
-    if isinstance(result, tuple):
-        result = result[0] if result else []
+    if (
+        isinstance(result, tuple)
+        and len(result) == 2
+        and isinstance(result[0], (list, tuple))
+    ):
+        result = result[0]
     if result is None:
         return []
     return list(result)
@@ -238,9 +242,9 @@ def poll_status(job) -> str:
             job.log_tail = job.error_message
         return normalized
     except Exception as exc:
-        _set_kaggle_status(job, "failed")
-        job.error_message = f"Kaggle status check failed: {exc}"
-        return "failed"
+        # A transient API/network error is not evidence that Kaggle failed.
+        # Let the pipeline retry this status request before failing the job.
+        raise RuntimeError(f"Kaggle status check failed: {exc}") from exc
 
 
 def fetch_output(job) -> None:

@@ -42,6 +42,12 @@
           <div id="progress-message" class="text-muted small">Waiting for a Kaggle GPU worker.</div>
           <div id="progress-connection" class="small mt-3"></div>
           <div id="job-error" class="alert alert-danger mt-3 mb-0 d-none" role="alert"></div>
+          {% if job.status == 'failed' and not (job.video_storage_path or (job.manifest_json or {}).get('local_final_video') or (job.manifest_json or {}).get('storage_path')) %}
+            <form method="post" action="{{ url_for('jobs.retry_video_download', job_id=job.id) }}" class="mt-3">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-primary" type="submit">Retry video download from Kaggle</button>
+            </form>
+          {% endif %}
         </div>
       </section>
 
