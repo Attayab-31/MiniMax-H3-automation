@@ -48,18 +48,27 @@ def _runtime_dir() -> Path:
 
 
 def _download_kernel_output(api, kernel_id: str, output_dir: Path, pattern: str):
-    """Download a filtered artifact when supported by the installed Kaggle CLI.
+    """Download output and return its paths across Kaggle client versions.
 
-    Kaggle's v1.6 client lacks ``file_pattern`` while newer clients provide it.
-    Keeping this capability check lets an existing local install fetch only the
-    manifest and final video without coupling the Flask service to one CLI API.
+    Kaggle client releases differ in whether ``kernels_output`` accepts a file
+    filter. The v1.6 client returns a list of every downloaded path (not a
+    ``(files, metadata)`` pair), so normalize its result here.
     """
     output_method = api.kernels_output
     if "file_pattern" in inspect.signature(output_method).parameters:
-        return output_method(
+        result = output_method(
             kernel_id, path=str(output_dir), file_pattern=pattern
         )
-    return output_method(kernel_id, path=str(output_dir))
+    else:
+        result = output_method(kernel_id, path=str(output_dir))
+
+    # Some wrappers return (files, metadata), while KaggleApi itself returns
+    # files directly. Never unpack the path list as a fixed-size tuple.
+    if isinstance(result, tuple):
+        result = result[0] if result else []
+    if result is None:
+        return []
+    return list(result)
 
 
 def _set_kaggle_status(job, status: str) -> None:
@@ -244,7 +253,7 @@ def fetch_output(job) -> None:
     output_dir = _runtime_dir() / "kaggle_outputs" / job.job_id
     output_dir.mkdir(parents=True, exist_ok=True)
     try:
-        files, _ = _download_kernel_output(
+        files = _download_kernel_output(
             api, kernel_id, output_dir, r"(^|/)automation_manifest\.json$"
         )
     except Exception as exc:
@@ -273,7 +282,7 @@ def fetch_output(job) -> None:
         raise RuntimeError("Kaggle manifest final video has an unsupported format.")
 
     try:
-        video_files, _ = _download_kernel_output(
+        video_files = _download_kernel_output(
             api, kernel_id, output_dir, rf"(^|/){re.escape(video_name)}$"
         )
     except Exception as exc:
