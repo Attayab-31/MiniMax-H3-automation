@@ -24,12 +24,14 @@ def upgrade():
     password = os.getenv("ADMIN_PASSWORD")
     if not password:
         raise RuntimeError("Set ADMIN_PASSWORD before upgrading to user workspaces.")
-    result = bind.execute(sa.text(
+    bind.execute(sa.text(
         "INSERT INTO users (username, password_hash, created_at) VALUES (:u, :p, CURRENT_TIMESTAMP)"
     ), {"u": username, "p": generate_password_hash(password)})
-    admin_id = result.lastrowid
-    if admin_id is None:
-        admin_id = bind.execute(sa.text("SELECT id FROM users WHERE username=:u"), {"u": username}).scalar_one()
+    # PostgreSQL's psycopg2 driver can report lastrowid as 0 for an INSERT.
+    # Resolve the generated key by the unique username instead.
+    admin_id = bind.execute(
+        sa.text("SELECT id FROM users WHERE username=:u"), {"u": username}
+    ).scalar_one()
 
     for table in ("kaggle_accounts", "schedules", "generation_jobs"):
         op.add_column(table, sa.Column("user_id", sa.Integer(), nullable=True))
