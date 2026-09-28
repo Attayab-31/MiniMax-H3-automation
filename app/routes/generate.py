@@ -6,7 +6,7 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 from flask_login import current_user, login_required
 
 from app import db
-from app.models import GenerationJob, KaggleAccount
+from app.models import GenerationJob, KaggleAccount, PlatformCredential
 from app.pipeline import run_pipeline_in_app_context
 from app.video_profiles import validate_video_profile
 
@@ -22,6 +22,9 @@ def generate():
     form_context = {
         "kaggle_accounts": kaggle_accounts,
         "environment_account_available": environment_account_available,
+        "connected_platforms": {
+            row.platform for row in PlatformCredential.query.filter_by(user_id=current_user.id).all()
+        },
     }
     if request.method == "POST":
         niche = (request.form.get("niche")
@@ -85,6 +88,10 @@ def generate():
                 flash("Choose an enabled Kaggle account in Settings first.", "error")
                 return render_template("generate.html", **form_context), 400
             kaggle_account_name = kaggle_account.label
+        target_platforms = list(dict.fromkeys(request.form.getlist("platforms")))
+        if not set(target_platforms) <= {"youtube", "tiktok"} or not set(target_platforms) <= form_context["connected_platforms"]:
+            flash("Connect each selected publishing account in Settings first.", "error")
+            return render_template("generate.html", **form_context), 400
         if not 1 <= turbo_steps <= 8 or not 4 <= steps <= 30:
             flash("Use 1-8 Turbo steps or 4-30 standard sampling steps.", "error")
             return render_template("generate.html", **form_context), 400
@@ -145,7 +152,7 @@ def generate():
             niche=niche,
             prompt_text=prompt_text,
             generation_params=params,
-            target_platforms=[],
+            target_platforms=target_platforms,
             status="queued",
         )
         params["_progress"] = {

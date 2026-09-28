@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.kaggle_accounts import encrypt_api_key
-from app.models import GenerationJob, KaggleAccount, Schedule
+from app.models import GenerationJob, KaggleAccount, PlatformCredential, Schedule
 from app.scheduler import remove_schedule_job
 
 settings_bp = Blueprint("settings", __name__)
@@ -60,13 +60,70 @@ def settings():
         return redirect(url_for("settings.settings"))
 
     accounts = KaggleAccount.query.filter_by(user_id=current_user.id).order_by(KaggleAccount.label.asc()).all()
-    configured = {
-        "Kaggle": bool((os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY")) or any(a.enabled for a in accounts)),
-        "Gemini": bool(os.getenv("GEMINI_API_KEY")),
-        "YouTube": bool(os.getenv("YOUTUBE_CLIENT_ID") and os.getenv("YOUTUBE_CLIENT_SECRET")),
-        "TikTok": bool(os.getenv("TIKTOK_CLIENT_KEY") and os.getenv("TIKTOK_CLIENT_SECRET")),
+    platform_connections = {
+        credential.platform: credential
+        for credential in PlatformCredential.query.filter_by(user_id=current_user.id).all()
     }
-    return render_template("settings.html", configured=configured, accounts=accounts)
+    configured = {
+        "Kaggle": bool(any(a.enabled for a in accounts) or (
+            current_user.username == os.getenv("ADMIN_USERNAME", "admin")
+            and os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY")
+        )),
+        "Gemini": "gemini" in platform_connections or bool(
+            current_user.username == os.getenv("ADMIN_USERNAME", "admin")
+            and os.getenv("GEMINI_API_KEY")
+        ),
+        "YouTube": "youtube" in platform_connections,
+        "TikTok": "tiktok" in platform_connections,
+    }
+    return render_template("settings.html", configured=configured, accounts=accounts, platform_connections=platform_connections)
+
+
+@settings_bp.route("/settings/platform-credentials", methods=["POST"])
+@login_required
+def save_platform_credentials():
+    platform = (request.form.get("platform") or "").strip().lower()
+    account_label = "default"
+    token_value = ((request.form.get("api_key") or "") if platform == "gemini"
+                   else (request.form.get("refresh_token") or "")).strip()
+    if platform not in {"gemini", "youtube", "tiktok"} or not token_value:
+        flash("Choose a supported service and enter its API key or refresh token.", "error")
+        return redirect(url_for("settings.settings"))
+    try:
+        encrypted_token = encrypt_api_key(token_value)
+    except RuntimeError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("settings.settings"))
+    credential = PlatformCredential.query.filter_by(
+        user_id=current_user.id, platform=platform, account_label=account_label
+    ).first()
+    if credential is None:
+        credential = PlatformCredential(
+            user_id=current_user.id,
+            platform=platform,
+            account_label=account_label,
+            scopes=(["generate_content"] if platform == "gemini" else
+                    ["youtube.upload"] if platform == "youtube" else ["video.publish"]),
+        )
+        db.session.add(credential)
+    credential.refresh_token_encrypted = None if platform == "gemini" else encrypted_token
+    credential.access_token_encrypted = encrypted_token if platform == "gemini" else None
+    credential.expires_at = None
+    db.session.commit()
+    flash(f"{platform.title()} connection saved for this workspace.", "success")
+    return redirect(url_for("settings.settings"))
+
+
+@settings_bp.route("/settings/platform-credentials/<platform>/<account_label>/delete", methods=["POST"])
+@login_required
+def delete_platform_credentials(platform: str, account_label: str):
+    credential = PlatformCredential.query.filter_by(
+        user_id=current_user.id, platform=platform, account_label=account_label
+    ).first_or_404()
+    db.session.delete(credential)
+    db.session.commit()
+    flash(f"{platform.title()} connection removed from this workspace.", "success")
+    return redirect(url_for("settings.settings"))
 
 
 @settings_bp.route("/settings/kaggle-accounts/<int:account_id>/toggle", methods=["POST"])

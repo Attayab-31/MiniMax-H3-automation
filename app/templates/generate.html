@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 
 {% block title %}Generate video{% endblock %}
 
@@ -47,6 +47,15 @@
       <section class="card shadow-sm mb-4">
         <div class="card-header py-3"><strong>2. Video plan</strong></div>
         <div class="card-body">
+          <fieldset class="mb-4">
+            <legend class="form-label">Publish a copy to your accounts</legend>
+            {% for platform, label in [('youtube', 'YouTube'), ('tiktok', 'TikTok')] %}
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="publish-{{ platform }}" name="platforms" value="{{ platform }}" {% if platform not in connected_platforms %}disabled{% endif %}>
+                <label class="form-check-label" for="publish-{{ platform }}">{{ label }}{% if platform not in connected_platforms %} · <a href="{{ url_for('settings.settings') }}">connect in Settings</a>{% endif %}</label>
+              </div>
+            {% endfor %}
+          </fieldset>
           <label class="form-label" for="kaggle_account_id">Kaggle account</label>
           <select class="form-select mb-2" id="kaggle_account_id" name="kaggle_account_id" required>
             {% set account_count = kaggle_accounts|length + (1 if environment_account_available else 0) %}

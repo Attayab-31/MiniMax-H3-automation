@@ -53,7 +53,7 @@
           {% endfor %}
         </div>
       {% else %}
-        <div class="empty-state mb-4">No saved Kaggle accounts yet. You can still use the legacy environment account if its credentials are configured.</div>
+        <div class="empty-state mb-4">No saved Kaggle accounts yet. Add your own credentials to start generating.</div>
       {% endif %}
       <form method="post" class="row g-3" autocomplete="off">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -76,6 +76,34 @@
         </div>
         <div class="col-12"><button class="btn btn-primary" type="submit">Add Kaggle account</button></div>
       </form>
+    </div>
+  </div>
+  <div class="card mb-4">
+    <div class="card-header px-4 py-3"><strong>Your publishing accounts</strong></div>
+    <div class="card-body p-4">
+      <p class="text-muted">Connect your own YouTube and TikTok accounts. Refresh tokens are encrypted and kept in your workspace. Add the platform app client keys to the server environment so the publisher can refresh access tokens.</p>
+      {% for platform, label in [('gemini', 'Gemini'), ('youtube', 'YouTube'), ('tiktok', 'TikTok')] %}
+        {% set connection = platform_connections.get(platform) %}
+        <div class="border rounded-3 p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>{{ label }}</strong>
+            {% if connection %}
+              <form method="post" action="{{ url_for('settings.delete_platform_credentials', platform=platform, account_label=connection.account_label) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Disconnect</button>
+              </form>
+            {% else %}<span class="text-muted small">Not connected</span>{% endif %}
+          </div>
+          {% if connection %}<p class="small text-success mb-2">Connected to this workspace. Saved token is hidden.</p>{% endif %}
+          <form method="post" action="{{ url_for('settings.save_platform_credentials') }}" class="row g-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="platform" value="{{ platform }}">
+            <div class="col-md-9"><input class="form-control" type="password" name="{{ 'api_key' if platform == 'gemini' else 'refresh_token' }}" autocomplete="new-password" required placeholder="Paste your {{ label }} {{ 'API key' if platform == 'gemini' else 'refresh token' }}"></div>
+            <div class="col-md-3"><button class="btn btn-outline-dark w-100" type="submit">{{ 'Update' if connection else 'Connect' }}</button></div>
+          </form>
+        </div>
+      {% endfor %}
+      <p class="form-text mb-0">Gemini keys and YouTube/TikTok refresh tokens are encrypted and never displayed after saving. Server environment keys remain available to the migrated admin only.</p>
     </div>
   </div>
   <div class="card">

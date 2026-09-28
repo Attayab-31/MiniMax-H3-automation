@@ -38,7 +38,9 @@ def credentials_for_job(job) -> dict:
         return {"username": username, "key": key, "kernel_id": kernel_id,
                 "account_key": "environment", "label": "Environment account"}
 
-    account = KaggleAccount.query.filter_by(id=job.kaggle_account_id).first()
+    account = KaggleAccount.query.filter_by(
+        id=job.kaggle_account_id, user_id=job.user_id
+    ).first()
     if account is None:
         raise RuntimeError("The Kaggle account assigned to this job is unavailable.")
     return {

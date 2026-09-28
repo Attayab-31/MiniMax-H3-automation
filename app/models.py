@@ -87,13 +87,14 @@ class KaggleAccount(db.Model):
 class PlatformCredential(db.Model):
     __tablename__ = "platform_credentials"
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     platform = db.Column(db.String(32), nullable=False)
     account_label = db.Column(db.String(200), nullable=False)
     access_token_encrypted = db.Column(db.Text, nullable=True)
     refresh_token_encrypted = db.Column(db.Text, nullable=True)
     expires_at = db.Column(db.DateTime, nullable=True)
     scopes = db.Column(db.JSON, nullable=False, default=list)
-    __table_args__ = (db.UniqueConstraint("platform", "account_label"),)
+    __table_args__ = (db.UniqueConstraint("user_id", "platform", "account_label"),)
 
 
 __all__ = ["User", "GenerationJob", "Schedule", "KaggleAccount", "PlatformCredential", "utcnow"]

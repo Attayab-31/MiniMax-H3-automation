@@ -16,8 +16,25 @@ def _run_with_timeout(fn, *args, timeout_seconds: int = 30, **kwargs):
         return future.result(timeout=timeout_seconds)
 
 
-def _get_client():
-    api_key = os.getenv("GEMINI_API_KEY")
+def _get_client(user_id: int):
+    api_key = None
+    if user_id is not None:
+        from app import db
+        from app.kaggle_accounts import decrypt_api_key
+        from app.models import PlatformCredential, User
+
+        credential = PlatformCredential.query.filter_by(
+            user_id=user_id, platform="gemini", account_label="default"
+        ).first()
+        if credential and credential.access_token_encrypted:
+            try:
+                api_key = decrypt_api_key(credential.access_token_encrypted)
+            except RuntimeError:
+                return None
+        if not api_key:
+            user = db.session.get(User, user_id)
+            if user and user.username == os.getenv("ADMIN_USERNAME", "admin"):
+                api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or genai is None:
         return None
     return genai.Client(api_key=api_key)
@@ -75,7 +92,9 @@ def _fallback_h3_segment_prompts(niche, style_notes, creative_brief, lengths):
 
 def generate_h3_segment_prompts(niche: str, style_notes: str | None,
                                 duration_seconds: float, chunk_seconds: float,
-                                creative_brief: dict | None = None) -> list[str]:
+                                creative_brief: dict | None = None,
+                                *,
+                                user_id: int) -> list[str]:
     """Write one self-contained, continuous MiniMax H3 shot prompt per notebook segment."""
     niche = (niche or "cinematic short video").strip()
     duration_seconds = float(duration_seconds or 30)
@@ -83,7 +102,7 @@ def generate_h3_segment_prompts(niche: str, style_notes: str | None,
     count = max(1, math.ceil(duration_seconds / chunk_seconds))
     lengths = [min(chunk_seconds, duration_seconds - index * chunk_seconds) for index in range(count)]
     fallback = _fallback_h3_segment_prompts(niche, style_notes, creative_brief or {}, lengths)
-    client = _get_client()
+    client = _get_client(user_id)
     if client is None:
         return fallback
 
@@ -128,9 +147,10 @@ def generate_h3_segment_prompts(niche: str, style_notes: str | None,
         return fallback
 
 
-def generate_platform_metadata(niche: str, prompt_used: str, platform: str) -> dict:
+def generate_platform_metadata(niche: str, prompt_used: str, platform: str,
+                               user_id: int) -> dict:
     platform_key = (platform or "youtube").lower()
-    client = _get_client()
+    client = _get_client(user_id)
     if client is None:
         return _fallback_platform_metadata(niche, prompt_used, platform_key)
 

@@ -68,6 +68,15 @@
             </select>
           </div>
         {% endfor %}
+        <div class="col-md-6">
+          <label class="form-label">Publish to your connected accounts</label>
+          {% for platform, label in [('youtube', 'YouTube'), ('tiktok', 'TikTok')] %}
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="schedule-{{ platform }}" name="platforms" value="{{ platform }}" {% if platform not in connected_platforms %}disabled{% endif %}>
+              <label class="form-check-label" for="schedule-{{ platform }}">{{ label }}{% if platform not in connected_platforms %} · <a href="{{ url_for('settings.settings') }}">connect in Settings</a>{% endif %}</label>
+            </div>
+          {% endfor %}
+        </div>
         <div class="col-md-4">
           <label class="form-label">Preset</label>
           <select class="form-select" id="resolution_preset" name="resolution_preset">

@@ -99,12 +99,12 @@
     <div class="col-md-4">
       <label class="form-label">Platforms</label>
       <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="youtube" name="platforms" value="youtube" {% if 'youtube' in (schedule.target_platforms or []) %}checked{% endif %}>
-        <label class="form-check-label" for="youtube">YouTube</label>
+        <input class="form-check-input" type="checkbox" id="youtube" name="platforms" value="youtube" {% if 'youtube' in (schedule.target_platforms or []) %}checked{% endif %} {% if 'youtube' not in connected_platforms %}disabled{% endif %}>
+        <label class="form-check-label" for="youtube">YouTube{% if 'youtube' not in connected_platforms %} · <a href="{{ url_for('settings.settings') }}">connect in Settings</a>{% endif %}</label>
       </div>
       <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="tiktok" name="platforms" value="tiktok" {% if 'tiktok' in (schedule.target_platforms or []) %}checked{% endif %}>
-        <label class="form-check-label" for="tiktok">TikTok</label>
+        <input class="form-check-input" type="checkbox" id="tiktok" name="platforms" value="tiktok" {% if 'tiktok' in (schedule.target_platforms or []) %}checked{% endif %} {% if 'tiktok' not in connected_platforms %}disabled{% endif %}>
+        <label class="form-check-label" for="tiktok">TikTok{% if 'tiktok' not in connected_platforms %} · <a href="{{ url_for('settings.settings') }}">connect in Settings</a>{% endif %}</label>
       </div>
     </div>
     <div class="col-12">

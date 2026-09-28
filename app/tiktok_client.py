@@ -35,15 +35,15 @@ def _decrypt(value: str | None) -> str | None:
     return _fernet().decrypt(value.encode("utf-8")).decode("utf-8")
 
 
-def get_tiktok_credential(account_label: str = "default") -> PlatformCredential | None:
-    return PlatformCredential.query.filter_by(platform="tiktok", account_label=account_label).first()
+def get_tiktok_credential(user_id: int, account_label: str = "default") -> PlatformCredential | None:
+    return PlatformCredential.query.filter_by(user_id=user_id, platform="tiktok", account_label=account_label).first()
 
 
-def refresh_access_token(account_label: str = "default") -> PlatformCredential:
-    credential = get_tiktok_credential(account_label)
+def refresh_access_token(user_id: int, account_label: str = "default") -> PlatformCredential:
+    credential = get_tiktok_credential(user_id, account_label)
     if credential is None:
         credential = PlatformCredential(
-            platform="tiktok", account_label=account_label, scopes=["upload"])
+            user_id=user_id, platform="tiktok", account_label=account_label, scopes=["upload"])
         db.session.add(credential)
 
     refresh_token = _decrypt(
@@ -73,21 +73,21 @@ def refresh_access_token(account_label: str = "default") -> PlatformCredential:
     return credential
 
 
-def get_valid_access_token(account_label: str = "default") -> str:
-    credential = get_tiktok_credential(account_label)
+def get_valid_access_token(user_id: int, account_label: str = "default") -> str:
+    credential = get_tiktok_credential(user_id, account_label)
     if credential is None:
         raise RuntimeError("No TikTok credentials are configured.")
     now = datetime.now(timezone.utc)
     if credential.expires_at is None or credential.expires_at <= now + timedelta(hours=1):
-        credential = refresh_access_token(account_label)
+        credential = refresh_access_token(user_id, account_label)
     token = _decrypt(credential.access_token_encrypted)
     if not token:
         raise RuntimeError("TikTok access token is missing.")
     return token
 
 
-def publish_video(video_path: str, title: str, description: str, hashtags: list[str], account_label: str = "default") -> dict:
-    token = get_valid_access_token(account_label)
+def publish_video(video_path: str, title: str, description: str, hashtags: list[str], user_id: int, account_label: str = "default") -> dict:
+    token = get_valid_access_token(user_id, account_label)
     headers = {"Authorization": f"Bearer {token}",
                "Content-Type": "application/json"}
 

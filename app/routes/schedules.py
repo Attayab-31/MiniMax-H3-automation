@@ -5,7 +5,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.creative_options import CREATIVE_OPTIONS, normalize_creative_brief
-from app.models import KaggleAccount, Schedule
+from app.models import KaggleAccount, PlatformCredential, Schedule
 from app.scheduler import add_or_update_schedule_job, remove_schedule_job
 
 
@@ -16,6 +16,9 @@ def _account_context():
     return {
         "kaggle_accounts": KaggleAccount.query.filter_by(user_id=current_user.id, enabled=True).order_by(KaggleAccount.label.asc()).all(),
         "environment_account_available": bool(current_user.username == os.getenv("ADMIN_USERNAME", "admin") and os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY")),
+        "connected_platforms": {
+            row.platform for row in PlatformCredential.query.filter_by(user_id=current_user.id).all()
+        },
         "creative_options": CREATIVE_OPTIONS,
     }
 
@@ -35,12 +38,23 @@ def _selected_account_id(value):
     return account.id
 
 
+def _selected_platforms():
+    platforms = list(dict.fromkeys(request.form.getlist("platforms")))
+    connected = {
+        row.platform for row in PlatformCredential.query.filter_by(user_id=current_user.id).all()
+    }
+    if not set(platforms) <= {"youtube", "tiktok"} or not set(platforms) <= connected:
+        raise ValueError("Connect each selected publishing account in Settings first.")
+    return platforms
+
+
 @schedules_bp.route("/schedules", methods=["GET", "POST"])
 @login_required
 def list_schedules():
     if request.method == "POST":
         try:
             account_id = _selected_account_id(request.form.get("kaggle_account_id", ""))
+            selected_platforms = _selected_platforms()
             duration = int(request.form.get("duration_seconds") or 30)
             chunk_seconds = int(request.form.get("chunk_seconds") or 10)
         except ValueError as exc:
@@ -59,7 +73,7 @@ def list_schedules():
             time_of_day=request.form.get("time_of_day") or "09:00",
             timezone=request.form.get("timezone") or "UTC",
             enabled=bool(request.form.get("enabled")),
-            target_platforms=request.form.getlist("platforms") or ["youtube"],
+            target_platforms=selected_platforms,
             resolution_preset=request.form.get(
                 "resolution_preset") or "Custom",
             custom_width=(int(request.form.get("custom_width"))
@@ -90,6 +104,7 @@ def detail(schedule_id: int):
     if request.method == "POST":
         try:
             account_id = _selected_account_id(request.form.get("kaggle_account_id", "environment"))
+            selected_platforms = _selected_platforms()
             duration = int(request.form.get("duration_seconds") or schedule.duration_seconds)
             chunk_seconds = int(request.form.get("chunk_seconds") or schedule.chunk_seconds or 10)
         except ValueError as exc:
@@ -107,8 +122,7 @@ def detail(schedule_id: int):
             "time_of_day") or schedule.time_of_day
         schedule.timezone = request.form.get("timezone") or schedule.timezone
         schedule.enabled = bool(request.form.get("enabled"))
-        schedule.target_platforms = request.form.getlist(
-            "platforms") or schedule.target_platforms or ["youtube"]
+        schedule.target_platforms = selected_platforms
         schedule.resolution_preset = request.form.get(
             "resolution_preset") or schedule.resolution_preset
         schedule.custom_width = (int(request.form.get(

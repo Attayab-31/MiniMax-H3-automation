@@ -87,6 +87,7 @@ def _resume_pipeline(job: GenerationJob):
                     job.niche or "general",
                     job.prompt_text or job.generation_params.get("prompt") or "",
                     platform,
+                    user_id=job.user_id,
                 )
                 job.post_results[platform] = _post_to_platform(platform, job, metadata)
                 db.session.commit()
@@ -124,6 +125,7 @@ def _post_to_platform(platform: str, job: GenerationJob, metadata: dict):
             title=metadata.get("title", "AI generated short video"),
             description=metadata.get("description", ""),
             hashtags=metadata.get("hashtags", []),
+            user_id=job.user_id,
             privacy="private",
         )
         return {"platform": platform, "status": "success", "result": result}
@@ -134,6 +136,7 @@ def _post_to_platform(platform: str, job: GenerationJob, metadata: dict):
             title=metadata.get("title", "AI generated short video"),
             description=metadata.get("description", ""),
             hashtags=metadata.get("hashtags", []),
+            user_id=job.user_id,
         )
         return {"platform": platform, "status": "success", "result": result}
 
@@ -214,7 +217,8 @@ def retry_posting_only(job: GenerationJob):
 
     for platform in job.target_platforms:
         metadata = generate_platform_metadata(
-            job.niche or "general", job.prompt_text or "", platform)
+            job.niche or "general", job.prompt_text or "", platform,
+            user_id=job.user_id)
         job.post_results[platform] = _post_to_platform(platform, job, metadata)
         db.session.commit()
 
@@ -244,6 +248,7 @@ def _run_pipeline(job: GenerationJob):
                 duration,
                 chunk_seconds,
                 creative_brief,
+                user_id=job.user_id,
             )
             job.generation_params = params
             db.session.commit()
@@ -273,7 +278,8 @@ def _run_pipeline(job: GenerationJob):
             db.session.commit()
             for platform in job.target_platforms:
                 metadata = generate_platform_metadata(
-                    job.niche or "general", job.prompt_text or job.generation_params.get("prompt") or "", platform)
+                    job.niche or "general", job.prompt_text or job.generation_params.get("prompt") or "", platform,
+                    user_id=job.user_id)
                 job.post_results[platform] = _post_to_platform(
                     platform, job, metadata)
                 db.session.commit()

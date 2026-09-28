@@ -22,7 +22,7 @@ Flask app for submitting H3 video jobs to Kaggle, scheduling generations, and st
    - `SUPABASE_URL`: the project URL, such as `https://<project-ref>.supabase.co`.
    - `SUPABASE_SERVICE_ROLE_KEY`: the project service role key from Supabase API settings. Store it only in Render secrets; never commit it or put it in browser code.
    - `DATABASE_URL`: the Supabase Transaction pooler URL.
-6. After deployment, open the Render service URL and create a user account. The existing single-user data is assigned to the configured `ADMIN_USERNAME` during migration; sign in with that username and `ADMIN_PASSWORD` to access it. New users have separate video libraries, schedules, and Kaggle credentials. Add one or more Kaggle accounts in **Settings** to select among their GPU notebooks when generating videos. You can optionally set Gemini and publishing integrations as Render environment variables.
+6. After deployment, open the Render service URL and create a user account. The existing single-user data is assigned to the configured `ADMIN_USERNAME` during migration; sign in with that username and `ADMIN_PASSWORD` to access it. Users have separate video libraries, prompts, schedules, Kaggle credentials, Gemini API keys, and YouTube/TikTok refresh tokens. Add one or more Kaggle accounts in **Settings** to select among their GPU notebooks when generating videos. Set the YouTube or TikTok app client keys in Render to enable publishing; each user adds their own Gemini key and platform refresh tokens in **Settings**.
 
 The start command applies committed Flask-Migrate revisions before Gunicorn starts. Keep schema changes in new migration files (`flask --app run db migrate -m "describe change"`) and commit them with the code.
 

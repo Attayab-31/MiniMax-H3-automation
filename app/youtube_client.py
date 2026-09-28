@@ -40,8 +40,8 @@ def _decrypt(value: str | None) -> str | None:
     return _fernet().decrypt(value.encode("utf-8")).decode("utf-8")
 
 
-def get_youtube_credential(account_label: str = "default") -> PlatformCredential | None:
-    return PlatformCredential.query.filter_by(platform="youtube", account_label=account_label).first()
+def get_youtube_credential(user_id: int, account_label: str = "default") -> PlatformCredential | None:
+    return PlatformCredential.query.filter_by(user_id=user_id, platform="youtube", account_label=account_label).first()
 
 
 def start_oauth_flow() -> str:
@@ -56,7 +56,7 @@ def start_oauth_flow() -> str:
     return auth_url
 
 
-def complete_oauth_flow(code: str, account_label: str = "default") -> PlatformCredential:
+def complete_oauth_flow(code: str, user_id: int, account_label: str = "default") -> PlatformCredential:
     secrets_file = os.getenv("YOUTUBE_CLIENT_SECRETS_FILE")
     if not secrets_file:
         raise RuntimeError("YOUTUBE_CLIENT_SECRETS_FILE is not configured.")
@@ -67,10 +67,10 @@ def complete_oauth_flow(code: str, account_label: str = "default") -> PlatformCr
     credentials = flow.credentials
 
     record = PlatformCredential.query.filter_by(
-        platform="youtube", account_label=account_label).first()
+        user_id=user_id, platform="youtube", account_label=account_label).first()
     if record is None:
         record = PlatformCredential(
-            platform="youtube", account_label=account_label, scopes=list(YOUTUBE_SCOPES))
+            user_id=user_id, platform="youtube", account_label=account_label, scopes=list(YOUTUBE_SCOPES))
         db.session.add(record)
 
     record.access_token_encrypted = _encrypt(credentials.token)
@@ -82,8 +82,8 @@ def complete_oauth_flow(code: str, account_label: str = "default") -> PlatformCr
     return record
 
 
-def _get_valid_service(account_label: str = "default"):
-    credential = get_youtube_credential(account_label)
+def _get_valid_service(user_id: int, account_label: str = "default"):
+    credential = get_youtube_credential(user_id, account_label)
     if credential is None:
         raise RuntimeError("No YouTube OAuth credential is configured.")
 
@@ -109,8 +109,8 @@ def _get_valid_service(account_label: str = "default"):
     return build("youtube", "v3", credentials=creds)
 
 
-def upload_video(video_path: str, title: str, description: str, hashtags: list[str], privacy: str = "private"):
-    service = _get_valid_service()
+def upload_video(video_path: str, title: str, description: str, hashtags: list[str], user_id: int, privacy: str = "private"):
+    service = _get_valid_service(user_id)
     body = {
         "snippet": {
             "title": title[:100],
