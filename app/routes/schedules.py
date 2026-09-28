@@ -1,7 +1,7 @@
 import os
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app import db
 from app.creative_options import CREATIVE_OPTIONS, normalize_creative_brief
@@ -14,22 +14,22 @@ schedules_bp = Blueprint("schedules", __name__)
 
 def _account_context():
     return {
-        "kaggle_accounts": KaggleAccount.query.filter_by(enabled=True).order_by(KaggleAccount.label.asc()).all(),
-        "environment_account_available": bool(os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY")),
+        "kaggle_accounts": KaggleAccount.query.filter_by(user_id=current_user.id, enabled=True).order_by(KaggleAccount.label.asc()).all(),
+        "environment_account_available": bool(current_user.username == os.getenv("ADMIN_USERNAME", "admin") and os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY")),
         "creative_options": CREATIVE_OPTIONS,
     }
 
 
 def _selected_account_id(value):
     if value == "environment":
-        if not (os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY")):
+        if not (current_user.username == os.getenv("ADMIN_USERNAME", "admin") and os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY")):
             raise ValueError("Configure this schedule with a saved Kaggle account.")
         return None
     try:
         account_id = int(value)
     except (TypeError, ValueError):
         raise ValueError("Choose an enabled Kaggle account for this schedule.")
-    account = KaggleAccount.query.filter_by(id=account_id, enabled=True).first()
+    account = KaggleAccount.query.filter_by(id=account_id, user_id=current_user.id, enabled=True).first()
     if account is None:
         raise ValueError("Choose an enabled Kaggle account for this schedule.")
     return account.id
@@ -45,11 +45,12 @@ def list_schedules():
             chunk_seconds = int(request.form.get("chunk_seconds") or 10)
         except ValueError as exc:
             flash(str(exc), "error")
-            return render_template("schedules.html", schedules=Schedule.query.order_by(Schedule.id.desc()).all(), **_account_context()), 400
+            return render_template("schedules.html", schedules=Schedule.query.filter_by(user_id=current_user.id).order_by(Schedule.id.desc()).all(), **_account_context()), 400
         if not 5 <= duration <= 60 or not 5 <= chunk_seconds <= 15:
             flash("Use a total duration from 5 to 60 seconds and a clip length from 5 to 15 seconds.", "error")
-            return render_template("schedules.html", schedules=Schedule.query.order_by(Schedule.id.desc()).all(), **_account_context()), 400
+            return render_template("schedules.html", schedules=Schedule.query.filter_by(user_id=current_user.id).order_by(Schedule.id.desc()).all(), **_account_context()), 400
         schedule = Schedule(
+            user_id=current_user.id,
             name=request.form.get("name") or "New Schedule",
             niche=(request.form.get("niche") or "cinematic lifestyle").strip(),
             style_notes=request.form.get("style_notes") or None,
@@ -78,14 +79,14 @@ def list_schedules():
         flash("Schedule created.", "success")
         return redirect(url_for("schedules.detail", schedule_id=schedule.id))
 
-    schedules = Schedule.query.order_by(Schedule.id.desc()).all()
+    schedules = Schedule.query.filter_by(user_id=current_user.id).order_by(Schedule.id.desc()).all()
     return render_template("schedules.html", schedules=schedules, **_account_context())
 
 
 @schedules_bp.route("/schedules/<int:schedule_id>", methods=["GET", "POST"])
 @login_required
 def detail(schedule_id: int):
-    schedule = db.get_or_404(Schedule, schedule_id)
+    schedule = Schedule.query.filter_by(id=schedule_id, user_id=current_user.id).first_or_404()
     if request.method == "POST":
         try:
             account_id = _selected_account_id(request.form.get("kaggle_account_id", "environment"))
@@ -134,7 +135,7 @@ def detail(schedule_id: int):
 @schedules_bp.route("/schedules/<int:schedule_id>/delete", methods=["POST"])
 @login_required
 def delete(schedule_id: int):
-    schedule = db.get_or_404(Schedule, schedule_id)
+    schedule = Schedule.query.filter_by(id=schedule_id, user_id=current_user.id).first_or_404()
     for job in schedule.jobs:
         job.schedule_id = None
     name = schedule.name

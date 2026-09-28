@@ -86,10 +86,10 @@ def _fire_schedule(app, schedule_id: int):
             if account is None or not account.enabled:
                 return
         preset_sizes = {
-            "Portrait vertical · 352×608": (352, 608),
-            "Fast preview · 512×288": (512, 288),
-            "Kaggle safe · 608×352": (608, 352),
-            "Detailed preview · 736×416": (736, 416),
+            "Portrait vertical Â· 352Ã—608": (352, 608),
+            "Fast preview Â· 512Ã—288": (512, 288),
+            "Kaggle safe Â· 608Ã—352": (608, 352),
+            "Detailed preview Â· 736Ã—416": (736, 416),
         }
         preset_width, preset_height = preset_sizes.get(
             schedule.resolution_preset, (schedule.custom_width or 352, schedule.custom_height or 608)
@@ -97,6 +97,7 @@ def _fire_schedule(app, schedule_id: int):
         creative_brief = dict(schedule.creative_brief or {})
         creative_brief["aspect_ratio"] = "9:16 portrait" if preset_height > preset_width else "16:9 landscape"
         job = GenerationJob(
+            user_id=schedule.user_id,
             mode="scheduled",
             schedule_id=schedule.id,
             kaggle_account_id=schedule.kaggle_account_id,
@@ -107,7 +108,7 @@ def _fire_schedule(app, schedule_id: int):
                 "niche": schedule.niche,
                 "style_notes": schedule.style_notes,
                 "creative_brief": creative_brief,
-                "resolution_preset": ("Custom" if schedule.resolution_preset == "Portrait vertical · 352×608" else schedule.resolution_preset),
+                "resolution_preset": ("Custom" if schedule.resolution_preset == "Portrait vertical Â· 352Ã—608" else schedule.resolution_preset),
                 "custom_width": preset_width,
                 "custom_height": preset_height,
                 "duration_seconds": schedule.duration_seconds,

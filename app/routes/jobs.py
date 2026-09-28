@@ -5,7 +5,7 @@ import os
 import shutil
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, send_file, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 from sqlalchemy import or_
 
 from app import csrf, db
@@ -63,7 +63,7 @@ def _delete_storage_object(job: GenerationJob) -> None:
 @jobs_bp.route("/jobs/<int:job_id>/delete-prompts", methods=["POST"])
 @login_required
 def delete_prompts(job_id: int):
-    job = db.get_or_404(GenerationJob, job_id)
+    job = GenerationJob.query.filter_by(id=job_id, user_id=current_user.id).first_or_404()
     if job.status in _ACTIVE_JOB_STATUSES:
         flash("Wait for this job to finish before deleting its prompts.", "error")
         return redirect(url_for("jobs.detail", job_id=job.id))
@@ -90,7 +90,7 @@ def delete_prompts(job_id: int):
 @jobs_bp.route("/jobs/<int:job_id>/delete-everything", methods=["POST"])
 @login_required
 def delete_everything(job_id: int):
-    job = db.get_or_404(GenerationJob, job_id)
+    job = GenerationJob.query.filter_by(id=job_id, user_id=current_user.id).first_or_404()
     if job.status in _ACTIVE_JOB_STATUSES:
         flash("Wait for this job to finish before deleting its data.", "error")
         return redirect(url_for("jobs.detail", job_id=job.id))
@@ -114,7 +114,7 @@ def delete_everything(job_id: int):
 def videos():
     page = request.args.get("page", 1, type=int)
     pagination = (
-        GenerationJob.query.filter(or_(
+        GenerationJob.query.filter(GenerationJob.user_id == current_user.id, or_(
             GenerationJob.video_storage_path.isnot(None),
             GenerationJob.manifest_json["storage_path"].as_string().isnot(None),
         ))
@@ -133,7 +133,7 @@ def videos():
 @jobs_bp.route("/jobs/<int:job_id>/delete-video", methods=["POST"])
 @login_required
 def delete_video(job_id: int):
-    job = db.get_or_404(GenerationJob, job_id)
+    job = GenerationJob.query.filter_by(id=job_id, user_id=current_user.id).first_or_404()
     if job.status not in {"completed", "failed"}:
         flash("Wait for this job to finish before deleting its video.", "error")
         return redirect(url_for("jobs.videos"))
@@ -282,7 +282,7 @@ def kaggle_progress(job_id: str):
 @jobs_bp.route("/jobs/<int:job_id>")
 @login_required
 def detail(job_id: int):
-    job = db.get_or_404(GenerationJob, job_id)
+    job = GenerationJob.query.filter_by(id=job_id, user_id=current_user.id).first_or_404()
     return render_template("job_detail.html", job=job)
 
 
@@ -290,7 +290,7 @@ def detail(job_id: int):
 @jobs_bp.route("/jobs/<int:job_id>/download", endpoint="download")
 @login_required
 def video(job_id: int):
-    job = db.get_or_404(GenerationJob, job_id)
+    job = GenerationJob.query.filter_by(id=job_id, user_id=current_user.id).first_or_404()
     manifest = job.manifest_json or {}
     filename = manifest.get("local_final_video")
     storage_path = job.video_storage_path or manifest.get("storage_path")
@@ -319,7 +319,7 @@ def video(job_id: int):
 @jobs_bp.route("/jobs/<int:job_id>/retry-posting", methods=["POST"])
 @login_required
 def retry_posting(job_id: int):
-    job = db.get_or_404(GenerationJob, job_id)
+    job = GenerationJob.query.filter_by(id=job_id, user_id=current_user.id).first_or_404()
     if (job.manifest_json or {}).get("local_final_video") or (job.manifest_json or {}).get("storage_path"):
         app = current_app._get_current_object()
         app.config["EXECUTOR"].submit(
@@ -333,7 +333,7 @@ def retry_posting(job_id: int):
 @jobs_bp.route("/jobs/<int:job_id>/retry-video-download", methods=["POST"])
 @login_required
 def retry_video_download(job_id: int):
-    job = db.get_or_404(GenerationJob, job_id)
+    job = GenerationJob.query.filter_by(id=job_id, user_id=current_user.id).first_or_404()
     manifest = job.manifest_json or {}
     if job.status != "failed":
         flash("Only failed jobs can retry the Kaggle video download.", "error")
@@ -361,7 +361,7 @@ def _run_retry_posting_in_app_context(app, job):
 @jobs_bp.route("/api/jobs/<int:job_id>")
 @login_required
 def job_api(job_id: int):
-    job = db.get_or_404(GenerationJob, job_id)
+    job = GenerationJob.query.filter_by(id=job_id, user_id=current_user.id).first_or_404()
     return jsonify({
         "id": job.id,
         "job_id": job.job_id,

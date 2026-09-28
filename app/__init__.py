@@ -62,7 +62,7 @@ def create_app() -> Flask:
     csrf.init_app(app)
     login_manager.init_app(app)
 
-    from app.models import GenerationJob, KaggleAccount, PlatformCredential, Schedule
+    from app.models import GenerationJob, KaggleAccount, PlatformCredential, Schedule, User
 
     # Start the scheduler on the first web request, after deployment migrations
     # have run. It remains in-process and therefore needs one Gunicorn worker.

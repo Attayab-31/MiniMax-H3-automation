@@ -2,7 +2,7 @@ import os
 import re
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app import db
 from app.kaggle_accounts import encrypt_api_key
@@ -40,7 +40,7 @@ def settings():
         except RuntimeError as exc:
             flash(str(exc), "error")
             return redirect(url_for("settings.settings"))
-        if KaggleAccount.query.filter(
+        if KaggleAccount.query.filter(KaggleAccount.user_id == current_user.id,
             (KaggleAccount.label == label)
             | (KaggleAccount.kernel_id == kernel_id)
             | (KaggleAccount.username.ilike(username))
@@ -48,6 +48,7 @@ def settings():
             flash("That account label or kernel ID is already registered.", "error")
             return redirect(url_for("settings.settings"))
         db.session.add(KaggleAccount(
+            user_id=current_user.id,
             label=label,
             username=username,
             api_key_encrypted=encrypted_key,
@@ -58,7 +59,7 @@ def settings():
         flash(f"Kaggle account {label} added.", "success")
         return redirect(url_for("settings.settings"))
 
-    accounts = KaggleAccount.query.order_by(KaggleAccount.label.asc()).all()
+    accounts = KaggleAccount.query.filter_by(user_id=current_user.id).order_by(KaggleAccount.label.asc()).all()
     configured = {
         "Kaggle": bool((os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY")) or any(a.enabled for a in accounts)),
         "Gemini": bool(os.getenv("GEMINI_API_KEY")),
@@ -71,7 +72,7 @@ def settings():
 @settings_bp.route("/settings/kaggle-accounts/<int:account_id>/toggle", methods=["POST"])
 @login_required
 def toggle_kaggle_account(account_id: int):
-    account = db.session.get(KaggleAccount, account_id)
+    account = KaggleAccount.query.filter_by(id=account_id, user_id=current_user.id).first_or_404()
     if account is None:
         abort(404)
     account.enabled = not account.enabled
@@ -95,7 +96,7 @@ def toggle_kaggle_account(account_id: int):
 @settings_bp.route("/settings/kaggle-accounts/<int:account_id>/delete", methods=["POST"])
 @login_required
 def delete_kaggle_account(account_id: int):
-    account = db.get_or_404(KaggleAccount, account_id)
+    account = KaggleAccount.query.filter_by(id=account_id, user_id=current_user.id).first_or_404()
     active_jobs = GenerationJob.query.filter(
         GenerationJob.kaggle_account_id == account.id,
         GenerationJob.status.in_(("queued", "pushing", "running", "downloading", "posting")),

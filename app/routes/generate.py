@@ -3,7 +3,7 @@ import os
 import secrets
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app import db
 from app.models import GenerationJob, KaggleAccount
@@ -17,8 +17,8 @@ generate_bp = Blueprint("generate", __name__)
 @generate_bp.route("/generate", methods=["GET", "POST"])
 @login_required
 def generate():
-    kaggle_accounts = KaggleAccount.query.filter_by(enabled=True).order_by(KaggleAccount.label.asc()).all()
-    environment_account_available = bool(os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY"))
+    kaggle_accounts = KaggleAccount.query.filter_by(user_id=current_user.id, enabled=True).order_by(KaggleAccount.label.asc()).all()
+    environment_account_available = bool(current_user.username == os.getenv("ADMIN_USERNAME", "admin") and os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY"))
     form_context = {
         "kaggle_accounts": kaggle_accounts,
         "environment_account_available": environment_account_available,
@@ -138,6 +138,7 @@ def generate():
         }
 
         job = GenerationJob(
+            user_id=current_user.id,
             mode="manual",
             kaggle_account_id=kaggle_account.id if kaggle_account else None,
             kaggle_account_name=kaggle_account_name,
