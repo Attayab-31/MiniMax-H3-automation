@@ -43,10 +43,19 @@ def upgrade():
 
     # Account names and kernel IDs only need to be unique within a user's workspace.
     convention = {"uq": "uq_%(table_name)s_%(column_0_name)s"}
+    unique_constraints = sa.inspect(bind).get_unique_constraints("kaggle_accounts")
+    constraint_names = {
+        tuple(constraint.get("column_names") or []): (
+            constraint.get("name")
+            or f"uq_kaggle_accounts_{(constraint.get('column_names') or [''])[0]}"
+        )
+        for constraint in unique_constraints
+    }
     with op.batch_alter_table("kaggle_accounts", naming_convention=convention) as batch:
         for name in ("label", "username", "kernel_id"):
-            old_name = f"{name}_key" if bind.dialect.name == "postgresql" else f"uq_kaggle_accounts_{name}"
-            batch.drop_constraint(old_name, type_="unique")
+            old_name = constraint_names.get((name,))
+            if old_name:
+                batch.drop_constraint(old_name, type_="unique")
         batch.create_unique_constraint("uq_kaggle_user_label", ["user_id", "label"])
         batch.create_unique_constraint("uq_kaggle_user_kernel", ["user_id", "kernel_id"])
 
