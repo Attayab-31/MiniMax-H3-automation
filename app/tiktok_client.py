@@ -1,5 +1,4 @@
 import hashlib
-import json
 import os
 from base64 import urlsafe_b64encode
 from datetime import datetime, timedelta, timezone
@@ -46,8 +45,7 @@ def refresh_access_token(user_id: int, account_label: str = "default") -> Platfo
             user_id=user_id, platform="tiktok", account_label=account_label, scopes=["upload"])
         db.session.add(credential)
 
-    refresh_token = _decrypt(
-        credential.refresh_token_encrypted) if credential.refresh_token_encrypted else os.getenv("TIKTOK_REFRESH_TOKEN")
+    refresh_token = _decrypt(credential.refresh_token_encrypted)
     if not refresh_token:
         raise RuntimeError("No TikTok refresh token is stored.")
 

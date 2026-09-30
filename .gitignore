@@ -2,6 +2,8 @@
 .env.*
 !.env.example
 .venv/
+instance/
+runtime/
 __pycache__/
 *.pyc
 *.db
@@ -13,8 +15,6 @@ __pycache__/
 .ruff_cache/
 coverage.xml
 .coverage
-secrets/*
-!secrets/.gitkeep
 runtime/kaggle_push/
 runtime/kaggle_outputs/
 runtime/params_*.json

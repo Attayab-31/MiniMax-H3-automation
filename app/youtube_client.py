@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, timezone
 from cryptography.fernet import Fernet
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
@@ -42,44 +41,6 @@ def _decrypt(value: str | None) -> str | None:
 
 def get_youtube_credential(user_id: int, account_label: str = "default") -> PlatformCredential | None:
     return PlatformCredential.query.filter_by(user_id=user_id, platform="youtube", account_label=account_label).first()
-
-
-def start_oauth_flow() -> str:
-    secrets_file = os.getenv("YOUTUBE_CLIENT_SECRETS_FILE")
-    if not secrets_file:
-        raise RuntimeError("YOUTUBE_CLIENT_SECRETS_FILE is not configured.")
-    flow = InstalledAppFlow.from_client_secrets_file(
-        secrets_file, YOUTUBE_SCOPES)
-    flow.redirect_uri = "urn:ietf:wg:oauth:2.0:oob"
-    auth_url, _ = flow.authorization_url(
-        access_type="offline", include_granted_scopes="true")
-    return auth_url
-
-
-def complete_oauth_flow(code: str, user_id: int, account_label: str = "default") -> PlatformCredential:
-    secrets_file = os.getenv("YOUTUBE_CLIENT_SECRETS_FILE")
-    if not secrets_file:
-        raise RuntimeError("YOUTUBE_CLIENT_SECRETS_FILE is not configured.")
-    flow = InstalledAppFlow.from_client_secrets_file(
-        secrets_file, YOUTUBE_SCOPES)
-    flow.redirect_uri = "urn:ietf:wg:oauth:2.0:oob"
-    flow.fetch_token(code=code)
-    credentials = flow.credentials
-
-    record = PlatformCredential.query.filter_by(
-        user_id=user_id, platform="youtube", account_label=account_label).first()
-    if record is None:
-        record = PlatformCredential(
-            user_id=user_id, platform="youtube", account_label=account_label, scopes=list(YOUTUBE_SCOPES))
-        db.session.add(record)
-
-    record.access_token_encrypted = _encrypt(credentials.token)
-    record.refresh_token_encrypted = _encrypt(credentials.refresh_token)
-    record.expires_at = datetime.now(
-        timezone.utc) + timedelta(seconds=credentials.expiry_seconds or 3600)
-    record.scopes = list(YOUTUBE_SCOPES)
-    db.session.commit()
-    return record
 
 
 def _get_valid_service(user_id: int, account_label: str = "default"):

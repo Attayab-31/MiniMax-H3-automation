@@ -1,7 +1,7 @@
 import os
 import re
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -130,8 +130,6 @@ def delete_platform_credentials(platform: str, account_label: str):
 @login_required
 def toggle_kaggle_account(account_id: int):
     account = KaggleAccount.query.filter_by(id=account_id, user_id=current_user.id).first_or_404()
-    if account is None:
-        abort(404)
     account.enabled = not account.enabled
     paused_schedules = []
     if not account.enabled:
