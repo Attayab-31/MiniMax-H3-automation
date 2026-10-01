@@ -158,7 +158,7 @@ def login():
             if user.status == "suspended":
 
                 flash(
-                    "XXYouXr acX4couXXnt hXXas beXXen suXspXXXended. PlXXXXeaXse conXXXtacXt tXXXhe aXXdmiXXniXXstraXXtorXX.",
+                    "CSRF token validation failed. Please refresh the page and try again.",
                     "error"
                 )
 
