@@ -9,6 +9,7 @@ kaggle==1.6.17
 google-genai==1.8.0
 google-api-python-client==2.150.0
 requests==2.32.3
+supabase==2.15.1
 cryptography==42.0.8
 python-dotenv==1.0.1
 # Gunicorn is Render's production server and is not needed for Windows development.

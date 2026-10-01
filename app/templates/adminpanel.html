@@ -127,17 +127,18 @@
 
                             {% if user.status == "suspended" %}
 
-    <span class="badge bg-danger">
-        Suspended
-    </span>
+                                <span class="badge bg-danger">
+                                    Suspended
+                                </span>
 
-{% else %}
+                            {% else %}
 
-    <span class="badge bg-success">
-        Active
-    </span>
+                                <span class="badge bg-success">
+                                    Active
+                                </span>
 
-{% endif %}
+                            {% endif %}
+
                         </td>
 
 
@@ -145,57 +146,80 @@
 
                             {% if user.status == "suspended" %}
 
-    <form
-        method="post"
-        action="{{ url_for('admin.unsuspend_user', user_id=user.id) }}"
-        class="d-inline"
-    >
+                                <form
+                                    method="post"
+                                    action="{{ url_for('admin.unsuspend_user', user_id=user.id) }}"
+                                    class="d-inline"
+                                >
 
-        <input
-            type="hidden"
-            name="csrf_token"
-            value="{{ csrf_token() }}"
-        >
+                                    <input
+                                        type="hidden"
+                                        name="csrf_token"
+                                        value="{{ csrf_token() }}"
+                                    >
 
-        <button
-            type="submit"
-            class="btn btn-sm btn-outline-success"
-        >
-            Unsuspend
-        </button>
+                                    <button
+                                        type="submit"
+                                        class="btn btn-sm btn-outline-success"
+                                    >
+                                        Unsuspend
+                                    </button>
 
-    </form>
+                                </form>
 
-{% else %}
+                            {% else %}
 
-    <form
-        method="post"
-        action="{{ url_for('admin.suspend_user', user_id=user.id) }}"
-        class="d-inline"
-    >
+                                <form
+                                    method="post"
+                                    action="{{ url_for('admin.suspend_user', user_id=user.id) }}"
+                                    class="d-inline"
+                                >
 
-        <input
-            type="hidden"
-            name="csrf_token"
-            value="{{ csrf_token() }}"
-        >
+                                    <input
+                                        type="hidden"
+                                        name="csrf_token"
+                                        value="{{ csrf_token() }}"
+                                    >
 
-        <input
-            type="hidden"
-            name="reason"
-            value="Suspended by administrator"
-        >
+                                    <input
+                                        type="hidden"
+                                        name="reason"
+                                        value="Suspended by administrator"
+                                    >
 
-        <button
-            type="submit"
-            class="btn btn-sm btn-outline-danger"
-        >
-            Suspend
-        </button>
+                                    <button
+                                        type="submit"
+                                        class="btn btn-sm btn-outline-danger"
+                                    >
+                                        Suspend
+                                    </button>
 
-    </form>
+                                </form>
 
-{% endif %}
+                            {% endif %}
+
+
+                            <form
+                                method="post"
+                                action="{{ url_for('admin.delete_user', user_id=user.id) }}"
+                                class="d-inline"
+                                onsubmit="return confirm('Are you sure you want to permanently delete this user and all associated data and videos? This action cannot be undone.');"
+                            >
+
+                                <input
+                                    type="hidden"
+                                    name="csrf_token"
+                                    value="{{ csrf_token() }}"
+                                >
+
+                                <button
+                                    type="submit"
+                                    class="btn btn-sm btn-danger"
+                                >
+                                    Delete
+                                </button>
+
+                            </form>
 
                         </td>
 
