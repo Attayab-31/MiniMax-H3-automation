@@ -1,47 +1,180 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ "Create account" if signup else "Login" }}{% endblock %}
+{% block title %}
+    {{ "Create account" if signup else "Login" }}
+{% endblock %}
 
 {% block content %}
-  <div class="auth-wrap">
+
+<div class="auth-wrap">
+
     <div class="auth-card row g-0">
-      <div class="col-lg-5 auth-brand d-flex flex-column justify-content-between">
-        <div>
-          <div class="d-inline-flex align-items-center mb-4">
-            <span class="brand-mark">H3</span>
-            <span class="brand-name">H3 Automation</span>
-          </div>
-          <h2 class="mb-3">Video automation</h2>
-          <p class="mb-0 text-white-50">Manage generation, schedules, and publishing from one secure workspace.</p>
-        </div>
-        <div class="mt-4 small text-white-50">
-          Secure access for the control dashboard.
-        </div>
-      </div>
 
-      <div class="col-lg-7 auth-form d-flex align-items-center">
-        <div class="w-100">
-          <div class="mb-4">
-            <div class="pill mb-2">Personal workspace</div>
-            <h1 class="h3 mb-1">{{ "Create your account" if signup else "Sign in" }}</h1>
-            <p class="text-muted mb-0">{{ "Set up a private workspace for your videos and Kaggle accounts." if signup else "Use your account credentials to continue." }}</p>
-          </div>
+        <!-- Left Brand Section -->
+        <div class="col-lg-5 auth-brand d-flex flex-column justify-content-between">
 
-          <form method="post">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="mb-3">
-              <label for="username" class="form-label">Username</label>
-              <input type="text" class="form-control" id="username" name="username" maxlength="80" autocomplete="username" required>
+            <div>
+
+                <div class="d-inline-flex align-items-center mb-4">
+
+                    <span class="brand-mark">H3</span>
+
+                    <span class="brand-name">
+                        H3 Automation
+                    </span>
+
+                </div>
+
+                <h2 class="mb-3">
+                    Video automation
+                </h2>
+
+                <p class="mb-0 text-white-50">
+                    Manage generation, schedules, and publishing from one
+                    secure workspace.
+                </p>
+
             </div>
-            <div class="mb-3">
-              <label for="password" class="form-label">Password</label>
-              <input type="password" class="form-control" id="password" name="password" autocomplete="{{ "new-password" if signup else "current-password" }}" {% if signup %}minlength="12"{% endif %} required>
+
+            <div class="mt-4 small text-white-50">
+                Secure access for the control dashboard.
             </div>
-            <button type="submit" class="btn btn-primary w-100">{{ "Create account" if signup else "Log in" }}</button>
-          </form>
-          <p class="small text-center mt-3">{% if signup %}Already registered? <a href="/login">Sign in</a>{% else %}New user? <a href="/signup">Create an account</a>{% endif %}</p>
+
         </div>
-      </div>
+
+
+        <!-- Right Form Section -->
+        <div class="col-lg-7 auth-form d-flex align-items-center">
+
+            <div class="w-100">
+
+                <!-- Header -->
+                <div class="mb-4">
+
+                    <div class="pill mb-2">
+                        Personal workspace
+                    </div>
+
+                    <h1 class="h3 mb-1">
+                        {{ "Create your account" if signup else "Sign in" }}
+                    </h1>
+
+                    <p class="text-muted mb-0">
+                        {{
+                            "Set up a private workspace for your videos and Kaggle accounts."
+                            if signup
+                            else
+                            "Use your account credentials to continue."
+                        }}
+                    </p>
+
+                </div>
+
+
+                <!-- Login / Signup Form -->
+                <form method="post">
+
+                    <!-- CSRF Protection -->
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ csrf_token() }}"
+                    >
+
+
+                    <!-- Username -->
+                    <div class="mb-3">
+
+                        <label
+                            for="username"
+                            class="form-label"
+                        >
+                            Username
+                        </label>
+
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="username"
+                            name="username"
+                            maxlength="80"
+                            autocomplete="username"
+                            required
+                        >
+
+                    </div>
+
+
+                    <!-- Password -->
+                    <div class="mb-3">
+
+                        <label
+                            for="password"
+                            class="form-label"
+                        >
+                            Password
+                        </label>
+
+                        <input
+                            type="password"
+                            class="form-control"
+                            id="password"
+                            name="password"
+                            autocomplete="{{ 'new-password' if signup else 'current-password' }}"
+                            {% if signup %}
+                                minlength="12"
+                            {% endif %}
+                            required
+                        >
+
+                    </div>
+
+
+                    <!-- Submit Button -->
+                    <button
+                        type="submit"
+                        class="btn btn-primary w-100"
+                    >
+                        {{ "Create account" if signup else "Log in" }}
+                    </button>
+
+                </form>
+
+
+                <!-- Navigation Links -->
+                <p class="small text-center mt-3">
+
+                    {% if signup %}
+
+                        Already registered?
+                        <a href="/login">
+                            Sign in
+                        </a>
+
+                    {% else %}
+
+                        New user?
+                        <a href="/signup">
+                            Create a User account
+                        </a>
+
+                        <br>
+
+                        Create Admin?
+                        <a href="/admin/signup">
+                            Create an admin account
+                        </a>
+
+                    {% endif %}
+
+                </p>
+
+            </div>
+
+        </div>
+
     </div>
-  </div>
+
+</div>
+
 {% endblock %}

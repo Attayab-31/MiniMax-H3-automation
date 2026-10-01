@@ -8,22 +8,75 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class Admin(UserMixin, db.Model):
+    __tablename__ = "admins"
+
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
+
+    username = db.Column(
+        db.String(80),
+        nullable=False,
+        unique=True,
+        index=True
+    )
+
+    password_hash = db.Column(
+        db.String(255),
+        nullable=False
+    )
+
+    created_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=utcnow
+    )
+
+    def get_id(self):
+        return f"admin:{self.id}"
+
+
 class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), nullable=False, unique=True, index=True)
+    username = db.Column(db.String(80), nullable=False,
+                         unique=True, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    status = db.Column(
+        db.String(20),
+        nullable=False,
+        default="active"
+    )
+
+    suspension_reason = db.Column(
+        db.String(255),
+        nullable=True
+    )
+
+    suspended_at = db.Column(
+        db.DateTime,
+        nullable=True
+    )
+
+    def get_id(self):
+        return f"user:{self.id}"
 
 
 class GenerationJob(db.Model):
     __tablename__ = "generation_jobs"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    job_id = db.Column(db.String(64), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.Integer, db.ForeignKey(
+        "users.id", ondelete="CASCADE"), nullable=False, index=True)
+    job_id = db.Column(db.String(64), unique=True,
+                       nullable=False, default=lambda: str(uuid.uuid4()))
     mode = db.Column(db.String(32), nullable=False, default="manual")
-    schedule_id = db.Column(db.Integer, db.ForeignKey("schedules.id"), nullable=True)
-    kaggle_account_id = db.Column(db.Integer, db.ForeignKey("kaggle_accounts.id", ondelete="SET NULL"), nullable=True)
+    schedule_id = db.Column(db.Integer, db.ForeignKey(
+        "schedules.id"), nullable=True)
+    kaggle_account_id = db.Column(db.Integer, db.ForeignKey(
+        "kaggle_accounts.id", ondelete="SET NULL"), nullable=True)
     kaggle_account_name = db.Column(db.String(120), nullable=True)
     niche = db.Column(db.String(255), nullable=True)
     prompt_text = db.Column(db.Text, nullable=True)
@@ -46,17 +99,20 @@ class GenerationJob(db.Model):
 class Schedule(db.Model):
     __tablename__ = "schedules"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey(
+        "users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = db.Column(db.String(120), nullable=False)
     niche = db.Column(db.String(255), nullable=False)
     style_notes = db.Column(db.Text, nullable=True)
     creative_brief = db.Column(db.JSON, nullable=False, default=dict)
-    kaggle_account_id = db.Column(db.Integer, db.ForeignKey("kaggle_accounts.id", ondelete="SET NULL"), nullable=True)
+    kaggle_account_id = db.Column(db.Integer, db.ForeignKey(
+        "kaggle_accounts.id", ondelete="SET NULL"), nullable=True)
     time_of_day = db.Column(db.String(20), nullable=False, default="09:00")
     timezone = db.Column(db.String(80), nullable=False, default="UTC")
     enabled = db.Column(db.Boolean, nullable=False, default=True)
     target_platforms = db.Column(db.JSON, nullable=False, default=list)
-    resolution_preset = db.Column(db.String(80), nullable=False, default="Custom")
+    resolution_preset = db.Column(
+        db.String(80), nullable=False, default="Custom")
     custom_width = db.Column(db.Integer, nullable=True, default=352)
     custom_height = db.Column(db.Integer, nullable=True, default=608)
     duration_seconds = db.Column(db.Integer, nullable=False, default=30)
@@ -74,27 +130,32 @@ class Schedule(db.Model):
 class KaggleAccount(db.Model):
     __tablename__ = "kaggle_accounts"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey(
+        "users.id", ondelete="CASCADE"), nullable=False, index=True)
     label = db.Column(db.String(120), nullable=False)
     username = db.Column(db.String(120), nullable=False)
     api_key_encrypted = db.Column(db.Text, nullable=False)
     kernel_id = db.Column(db.String(255), nullable=False)
     enabled = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
-    __table_args__ = (db.UniqueConstraint("user_id", "label"), db.UniqueConstraint("user_id", "kernel_id"))
+    __table_args__ = (db.UniqueConstraint("user_id", "label"),
+                      db.UniqueConstraint("user_id", "kernel_id"))
 
 
 class PlatformCredential(db.Model):
     __tablename__ = "platform_credentials"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey(
+        "users.id", ondelete="CASCADE"), nullable=False, index=True)
     platform = db.Column(db.String(32), nullable=False)
     account_label = db.Column(db.String(200), nullable=False)
     access_token_encrypted = db.Column(db.Text, nullable=True)
     refresh_token_encrypted = db.Column(db.Text, nullable=True)
     expires_at = db.Column(db.DateTime, nullable=True)
     scopes = db.Column(db.JSON, nullable=False, default=list)
-    __table_args__ = (db.UniqueConstraint("user_id", "platform", "account_label"),)
+    __table_args__ = (db.UniqueConstraint(
+        "user_id", "platform", "account_label"),)
 
 
-__all__ = ["User", "GenerationJob", "Schedule", "KaggleAccount", "PlatformCredential", "utcnow"]
+__all__ = ["User", "GenerationJob", "Schedule",
+           "KaggleAccount", "PlatformCredential", "utcnow"]

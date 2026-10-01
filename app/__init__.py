@@ -4,8 +4,9 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
-from flask import Flask
-from flask_login import LoginManager
+from flask import Flask, flash, redirect, url_for, request
+from flask_login import LoginManager, current_user, logout_user
+
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf.csrf import CSRFProtect
@@ -24,20 +25,25 @@ def create_app() -> Flask:
     app = Flask(__name__)
     secret_key = os.getenv("FLASK_SECRET_KEY")
     if not secret_key:
-        raise RuntimeError("FLASK_SECRET_KEY must be configured before starting the application.")
+        raise RuntimeError(
+            "FLASK_SECRET_KEY must be configured before starting the application.")
     app.config["SECRET_KEY"] = secret_key
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-    app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+    app.config["SESSION_COOKIE_SECURE"] = os.getenv(
+        "SESSION_COOKIE_SECURE", "false").lower() == "true"
     app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
-    database_url = os.getenv("DATABASE_URL", "sqlite:///h3_automation.db").strip()
+    database_url = os.getenv(
+        "DATABASE_URL", "sqlite:///h3_automation.db").strip()
     if database_url.startswith("postgres://"):
-        database_url = "postgresql+psycopg2://" + database_url.removeprefix("postgres://")
+        database_url = "postgresql+psycopg2://" + \
+            database_url.removeprefix("postgres://")
     elif database_url.startswith("postgresql://"):
         # requirements.txt provides psycopg2-binary. Explicitly name that
         # driver because newer SQLAlchemy releases otherwise default to
         # psycopg (v3), which is a separate dependency.
-        database_url = "postgresql+psycopg2://" + database_url.removeprefix("postgresql://")
+        database_url = "postgresql+psycopg2://" + \
+            database_url.removeprefix("postgresql://")
     if database_url.startswith("postgresql+psycopg2://") and "sslmode=" not in database_url:
         database_url += "&sslmode=require" if "?" in database_url else "?sslmode=require"
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
@@ -47,15 +53,21 @@ def create_app() -> Flask:
         "pool_recycle": 300,
     }
     # Each Kaggle account has an independent kernel; same-account jobs are serialized.
-    max_workers = max(1, min(32, int(os.getenv("KAGGLE_MAX_CONCURRENT_ACCOUNTS", "8"))))
+    max_workers = max(
+        1, min(32, int(os.getenv("KAGGLE_MAX_CONCURRENT_ACCOUNTS", "8"))))
     app.config["EXECUTOR"] = ThreadPoolExecutor(max_workers=max_workers)
     atexit.register(app.config["EXECUTOR"].shutdown, wait=False)
     app.config["FERNET_KEY"] = os.getenv("FERNET_KEY", "")
-    app.config["KAGGLE_CALLBACK_URL"] = os.getenv("KAGGLE_CALLBACK_URL", "").strip()
-    app.config["KAGGLE_CALLBACK_TOKEN"] = os.getenv("KAGGLE_CALLBACK_TOKEN", "").strip()
-    app.config["SUPABASE_URL"] = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
-    app.config["SUPABASE_SERVICE_ROLE_KEY"] = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
-    app.config["SUPABASE_STORAGE_BUCKET"] = os.getenv("SUPABASE_STORAGE_BUCKET", "h3-videos").strip()
+    app.config["KAGGLE_CALLBACK_URL"] = os.getenv(
+        "KAGGLE_CALLBACK_URL", "").strip()
+    app.config["KAGGLE_CALLBACK_TOKEN"] = os.getenv(
+        "KAGGLE_CALLBACK_TOKEN", "").strip()
+    app.config["SUPABASE_URL"] = os.getenv(
+        "SUPABASE_URL", "").strip().rstrip("/")
+    app.config["SUPABASE_SERVICE_ROLE_KEY"] = os.getenv(
+        "SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    app.config["SUPABASE_STORAGE_BUCKET"] = os.getenv(
+        "SUPABASE_STORAGE_BUCKET", "h3-videos").strip()
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -63,6 +75,35 @@ def create_app() -> Flask:
     login_manager.init_app(app)
 
     from app.models import GenerationJob, KaggleAccount, PlatformCredential, Schedule, User
+
+    @app.before_request
+    def block_suspended_users():
+
+        if not current_user.is_authenticated:
+            return None
+
+        if not isinstance(current_user, User):
+            return None
+
+        if current_user.status != "suspended":
+            return None
+
+        if request.endpoint in {
+            "auth.login",
+            "auth.logout"
+        }:
+            return None
+
+        logout_user()
+
+        flash(
+            "Your account has been suspended. Please contact the administrator.",
+            "error"
+        )
+
+        return redirect(
+            url_for("auth.login")
+        )
 
     # Start the scheduler on the first web request, after deployment migrations
     # have run. It remains in-process and therefore needs one Gunicorn worker.
@@ -85,7 +126,9 @@ def create_app() -> Flask:
     from app.routes.jobs import jobs_bp
     from app.routes.schedules import schedules_bp
     from app.routes.settings import settings_bp
+    from app.routes.admin import adminpanel_bp
 
+    app.register_blueprint(adminpanel_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(generate_bp)
