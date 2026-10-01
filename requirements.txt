@@ -11,4 +11,5 @@ google-api-python-client==2.150.0
 requests==2.32.3
 cryptography==42.0.8
 python-dotenv==1.0.1
+# Gunicorn is Render's production server and is not needed for Windows development.
 gunicorn==23.0.0; platform_system != "Windows"

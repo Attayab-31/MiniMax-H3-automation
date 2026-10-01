@@ -33,7 +33,7 @@ python -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Edit `.env`: set `FLASK_SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and a valid `FERNET_KEY`. Generate the two secrets with:
+Edit `.env`: set `FLASK_SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `ADMIN_CODE`, and a valid `FERNET_KEY`. Generate separate random values for the session and admin signup secrets, and generate the Fernet key with:
 
 ```powershell
 python -c "import secrets; print(secrets.token_urlsafe(48))"
@@ -47,13 +47,13 @@ flask --app run db upgrade
 python run.py
 ```
 
-Open <http://127.0.0.1:5000>. The migration creates the configured admin user; sign in with `ADMIN_USERNAME` and `ADMIN_PASSWORD`. Other users can create accounts from **Create an account**. Each user adds their own credentials under **Settings**.
+Open <http://127.0.0.1:5000>. The migration creates the initial workspace user with `ADMIN_USERNAME` and `ADMIN_PASSWORD`. Create the separate admin-panel account once at `/admin/signup` using `ADMIN_CODE`, then sign in with that account to open the admin panel. Other users can register from **Create an account**. Each user adds their own credentials under **Settings**.
 
-When upgrading an existing database, the workspace migrations assign the existing jobs, schedules, Kaggle accounts, and platform credentials to the configured initial admin user. Keep a database backup before production upgrades.
+When upgrading an existing database, the workspace migrations assign existing jobs, schedules, Kaggle accounts, and platform credentials to the configured initial workspace user. Keep a database backup before production upgrades.
 
 ## Production deployment
 
-Render deployment is configured in [`render.yaml`](render.yaml). It runs migrations before starting Gunicorn. Production needs PostgreSQL, a stable `FLASK_SECRET_KEY`, `ADMIN_PASSWORD`, and `FERNET_KEY`. Configure private Supabase Storage for durable videos. See [Deployment](docs/deployment.md) for setup, migration recovery, and service limits.
+Render deployment is configured in [`render.yaml`](render.yaml). It runs migrations before starting Gunicorn. Production needs PostgreSQL, a stable `FLASK_SECRET_KEY`, `ADMIN_PASSWORD`, `ADMIN_CODE`, and `FERNET_KEY`. Configure private Supabase Storage for durable videos. See [Deployment](docs/deployment.md) for setup, migration recovery, and service limits.
 
 ## Repository map
 

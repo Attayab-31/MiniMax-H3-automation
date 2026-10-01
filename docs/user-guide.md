@@ -2,7 +2,7 @@
 
 ## Accounts and workspace isolation
 
-Choose **Create an account** to register a username and password, then sign in. The first deployment also creates the configured administrator account through the workspace migration. That account uses the same workspace features as other accounts; the code does not define a separate role-based admin console.
+Choose **Create an account** to register a regular workspace user, then sign in. The first workspace migration also creates the initial workspace user from the configured `ADMIN_USERNAME` and `ADMIN_PASSWORD`. Separately, the operator creates the admin-panel account once at `/admin/signup` using `ADMIN_CODE`; that account can manage users from the admin panel.
 
 Your jobs, schedules, Kaggle accounts, and platform credentials belong to your user record. The dashboard, job detail pages, video library, and settings only show the signed-in user's records. Use **Settings** to add or remove credentials. A Kaggle account includes a display label, Kaggle username, API key, and notebook kernel ID. Add multiple Kaggle accounts to distribute separate jobs across their kernels. A given account's kernel work is serialized.
 

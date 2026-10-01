@@ -5,8 +5,9 @@ The application reads environment variables (and a local `.env` via `python-dote
 | Variable | Required | Purpose and behavior |
 | --- | --- | --- |
 | `FLASK_SECRET_KEY` | Yes | Flask session signing key. Startup fails if missing. Keep stable across restarts and instances. |
-| `ADMIN_USERNAME` | For first workspace migration | Username created by migration; defaults to `admin`. Existing admin username/password are database records, so changing env values later does not reset them. |
-| `ADMIN_PASSWORD` | For first workspace migration | Initial password for the migration-created admin account. Migration fails if no usable admin password is available. |
+| `ADMIN_USERNAME` | For first workspace migration | Username for the initial workspace user; defaults to `admin`. Existing account usernames/passwords are database records, so changing env values later does not reset them. |
+| `ADMIN_PASSWORD` | For first workspace migration | Initial password for the migration-created workspace user. Migration fails if no usable password is available. |
+| `ADMIN_CODE` | For initial admin-panel setup | Shared secret required to create the separate admin-panel account at `/admin/signup`. Configure it before first admin setup and keep it private. |
 | `DATABASE_URL` | No, local default | SQLAlchemy URL; defaults to `sqlite:///h3_automation.db`. PostgreSQL URLs are normalized to psycopg2 and get `sslmode=require` if absent. Production should use managed PostgreSQL. |
 | `FERNET_KEY` | Needed to save encrypted credentials | Encryption key used for Kaggle and platform credentials. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Keep the same key for the lifetime of encrypted records. |
 | `SESSION_COOKIE_SECURE` | No | Set `true` behind HTTPS in production. Defaults to `false` for local HTTP. Cookies are also HTTP-only and SameSite Lax. |

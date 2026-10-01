@@ -7,8 +7,9 @@ from unittest.mock import Mock, patch
 
 from app import create_app, db
 from app.kaggle_client import poll_status, trigger_generation
-from app.models import GenerationJob, KaggleAccount, Schedule
+from app.models import GenerationJob, KaggleAccount, Schedule, User
 from app.scheduler import _fire_schedule
+from werkzeug.security import generate_password_hash
 
 
 class ManualGenerateRouteTests(unittest.TestCase):
@@ -23,17 +24,27 @@ class ManualGenerateRouteTests(unittest.TestCase):
 
         with self.app.app_context():
             db.create_all()
+            user = User(
+                username="admin",
+                password_hash=generate_password_hash("BrightHorizon"),
+            )
+            db.session.add(user)
+            db.session.commit()
+            self.user_id = user.id
 
         self.client = self.app.test_client()
 
     def _csrf_token(self, path: str) -> str:
         response = self.client.get(path)
         match = re.search(
-            r'name="csrf_token" value="([^"]+)"',
+            r'name="csrf_token"\s+value="([^"]+)"',
             response.get_data(as_text=True),
         )
         self.assertIsNotNone(match, f"No CSRF field found in {path}.")
         return match.group(1)
+
+    def _new_job(self, **kwargs):
+        return GenerationJob(user_id=self.user_id, **kwargs)
 
     def _login(self):
         token = self._csrf_token("/login")
@@ -88,7 +99,8 @@ class ManualGenerateRouteTests(unittest.TestCase):
             self.assertEqual(job.generation_params["custom_height"], 608)
             self.assertEqual(job.generation_params["chunk_seconds"], 10)
             self.assertEqual(len(job.generation_params["segment_prompts"]), 3)
-            self.assertTrue(job.generation_params["segment_prompts"][0].endswith("Show the desk"))
+            self.assertTrue(
+                job.generation_params["segment_prompts"][0].endswith("Show the desk"))
 
     def test_pipeline_worker_runs_with_app_context(self):
         from app.pipeline import run_pipeline_in_app_context
@@ -97,7 +109,7 @@ class ManualGenerateRouteTests(unittest.TestCase):
                 patch("app.pipeline.poll_status", return_value="completed"), \
                 patch("app.pipeline.fetch_output"):
             with self.app.app_context():
-                job = GenerationJob(
+                job = self._new_job(
                     mode="manual",
                     status="queued",
                     target_platforms=[],
@@ -116,7 +128,7 @@ class ManualGenerateRouteTests(unittest.TestCase):
         self._login()
         self.app.config["EXECUTOR"].submit = Mock()
         with self.app.app_context():
-            job = GenerationJob(
+            job = self._new_job(
                 mode="manual",
                 status="failed",
                 error_message="Kaggle output download failed",
@@ -143,6 +155,7 @@ class ManualGenerateRouteTests(unittest.TestCase):
     def test_custom_schedule_sizes_are_preserved_for_generations(self):
         with self.app.app_context():
             schedule = Schedule(
+                user_id=self.user_id,
                 name="Custom size run",
                 niche="cinematic lifestyle",
                 time_of_day="09:00",
@@ -180,7 +193,7 @@ class ManualGenerateRouteTests(unittest.TestCase):
                     "KAGGLE_KEY": "demo-key",
                     "KAGGLE_KERNEL_ID": "demo-user/minimax-h3-automation",
                 }, clear=False):
-            job = GenerationJob(
+            job = self._new_job(
                 mode="manual",
                 status="queued",
                 target_platforms=["youtube"],
@@ -219,7 +232,7 @@ class ManualGenerateRouteTests(unittest.TestCase):
 
     def test_kaggle_progress_callback_requires_token_and_updates_job(self):
         with self.app.app_context():
-            job = GenerationJob(
+            job = self._new_job(
                 mode="manual",
                 status="running",
                 generation_params={"_progress": {"total_segments": 3}},
@@ -237,7 +250,8 @@ class ManualGenerateRouteTests(unittest.TestCase):
             "segment_progress": 0.5,
         }
         with patch.dict(os.environ, {"KAGGLE_CALLBACK_TOKEN": "test-progress-token"}):
-            rejected = self.client.post(f"/api/kaggle/progress/{job_id}", json=payload)
+            rejected = self.client.post(
+                f"/api/kaggle/progress/{job_id}", json=payload)
             self.assertEqual(rejected.status_code, 401)
             accepted = self.client.post(
                 f"/api/kaggle/progress/{job_id}",
@@ -249,20 +263,22 @@ class ManualGenerateRouteTests(unittest.TestCase):
         self.assertEqual(accepted.json["percent"], 50)
         with self.app.app_context():
             job = GenerationJob.query.filter_by(job_id=job_id).one()
-            self.assertEqual(job.generation_params["_progress"]["current_segment"], 2)
+            self.assertEqual(
+                job.generation_params["_progress"]["current_segment"], 2)
 
     def test_generate_rejects_missing_csrf_token(self):
         self._login()
         response = self.client.post(
             "/generate",
-            data={"prompt": "A test prompt", "kaggle_account_id": "environment"},
+            data={"prompt": "A test prompt",
+                  "kaggle_account_id": "environment"},
         )
         self.assertEqual(response.status_code, 400)
 
     def test_my_videos_lists_bucket_backed_jobs(self):
         self._login()
         with self.app.app_context():
-            job = GenerationJob(
+            job = self._new_job(
                 mode="manual",
                 status="completed",
                 niche="rainy city at night",
@@ -287,7 +303,7 @@ class ManualGenerateRouteTests(unittest.TestCase):
     def test_delete_video_removes_storage_reference_and_keeps_job(self):
         self._login()
         with self.app.app_context():
-            job = GenerationJob(
+            job = self._new_job(
                 mode="manual",
                 status="completed",
                 niche="quiet forest",
@@ -320,7 +336,7 @@ class ManualGenerateRouteTests(unittest.TestCase):
     def test_delete_prompts_keeps_video_and_job(self):
         self._login()
         with self.app.app_context():
-            job = GenerationJob(
+            job = self._new_job(
                 mode="manual",
                 status="completed",
                 niche="city lights",
@@ -358,7 +374,7 @@ class ManualGenerateRouteTests(unittest.TestCase):
     def test_delete_everything_removes_job_and_calls_storage(self):
         self._login()
         with self.app.app_context():
-            job = GenerationJob(
+            job = self._new_job(
                 mode="manual",
                 status="completed",
                 prompt_text="A quiet ocean at sunrise.",
@@ -389,7 +405,7 @@ class ManualGenerateRouteTests(unittest.TestCase):
     def test_delete_everything_keeps_job_when_storage_delete_fails(self):
         self._login()
         with self.app.app_context():
-            job = GenerationJob(
+            job = self._new_job(
                 mode="manual", status="completed", prompt_text="Keep me if storage fails",
                 generation_params={}, manifest_json={"storage_path": "jobs/failed/video.mp4"},
                 video_storage_path="jobs/failed/video.mp4", target_platforms=[],
@@ -413,6 +429,7 @@ class ManualGenerateRouteTests(unittest.TestCase):
         self._login()
         with self.app.app_context():
             account = KaggleAccount(
+                user_id=self.user_id,
                 label="Secondary", username="secondary-user",
                 api_key_encrypted="encrypted-placeholder",
                 kernel_id="secondary-user/h3-automation-secondary", enabled=True,
@@ -420,11 +437,12 @@ class ManualGenerateRouteTests(unittest.TestCase):
             db.session.add(account)
             db.session.flush()
             schedule = Schedule(
+                user_id=self.user_id,
                 name="Secondary schedule", niche="nature", time_of_day="09:00",
                 timezone="UTC", enabled=True, kaggle_account_id=account.id,
                 target_platforms=[],
             )
-            job = GenerationJob(
+            job = self._new_job(
                 mode="manual", status="completed", kaggle_account_id=account.id,
                 kaggle_account_name=account.label, generation_params={}, target_platforms=[],
             )
@@ -450,13 +468,14 @@ class ManualGenerateRouteTests(unittest.TestCase):
         self._login()
         with self.app.app_context():
             schedule = Schedule(
+                user_id=self.user_id,
                 name="Daily prompt", niche="wildlife", style_notes="A red fox",
                 time_of_day="09:00", timezone="UTC", enabled=True,
                 target_platforms=[],
             )
             db.session.add(schedule)
             db.session.flush()
-            job = GenerationJob(
+            job = self._new_job(
                 mode="scheduled", status="completed", schedule_id=schedule.id,
                 niche="wildlife", prompt_text="A red fox walks through snow.",
                 generation_params={}, target_platforms=[],

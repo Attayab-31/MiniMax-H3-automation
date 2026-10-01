@@ -4,7 +4,7 @@
 
 Passwords are stored as Werkzeug password hashes. Authenticated views scope jobs, schedules, Kaggle accounts, and platform credentials to the current user. Routes that act on a row should query by both its identifier and the current user's ID. Jobs retain their owner so provider clients can select that user's credentials. Database foreign keys cascade user-owned data where configured.
 
-The signup endpoint is open to anyone who can reach the application. The code does not currently implement email verification, password reset, account recovery, configurable invitations, or role-based authorization. Protect a public deployment accordingly and monitor account creation. The configured admin account is not a separate superuser role.
+User signup is open to anyone who can reach the application. The code does not currently implement email verification, password reset, account recovery, or configurable invitations. A separate admin-panel account is created using the operator-configured `ADMIN_CODE`, and admin routes check for that account type. Protect a public deployment accordingly, keep the setup code private, and monitor account creation.
 
 ## Secrets and sessions
 

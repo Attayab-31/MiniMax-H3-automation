@@ -11,7 +11,7 @@ python -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Set `FLASK_SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `FERNET_KEY`, then migrate and run:
+Set `FLASK_SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `FERNET_KEY`. Set `ADMIN_CODE` if you need to create the separate admin-panel account at `/admin/signup`. Then migrate and run:
 
 ```powershell
 flask --app run db upgrade
@@ -50,7 +50,14 @@ Every user-owned query and mutation must verify `user_id` from the authenticated
 
 ## Tests and live integrations
 
-The repository includes local tests and `test_kaggle_live_smoke.py`, which makes real Kaggle API calls and needs credentials and a configured kernel. Run that live check only when you intentionally want to use the external Kaggle account. Tests that touch provider services, cloud resources, or user data should use isolated local fixtures and mocked clients. This guide does not claim the current suite passes; refresh fixtures when schema or ownership requirements change.
+Run the local test modules with:
+
+```powershell
+python -m unittest discover -s tests -p test_manual_generate.py -v
+python -m unittest discover -s tests -p test_kaggle_client_output.py -v
+```
+
+`test_kaggle_live_smoke.py` makes real Kaggle API calls and needs credentials and a configured kernel. Run it only when you intentionally want to use the external Kaggle account. Tests that touch provider services, cloud resources, or user data should use isolated local fixtures and mocked clients.
 
 ## Change checklist
 
