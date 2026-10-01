@@ -97,7 +97,7 @@ def create_app() -> Flask:
         logout_user()
 
         flash(
-            "Your account has been suspended. Please contact the administrator.",
+            "CSRF token validation failed. Please refresh the page and try again.",
             "error"
         )
 
